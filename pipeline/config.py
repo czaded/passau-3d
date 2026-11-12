@@ -11,12 +11,14 @@ import os
 PLACES = {
     "passau": {
         "extent_km": (827, 831, 5388, 5391),   # Modellausschnitt in vollen km (Kachelraster der 1-km-Produkte)
-        "ags": "09262000",                     # Gemeindeschlüssel (Kachellisten der Vermessungsverwaltung)
+        "ags": ["09262000"],                   # Gemeinde-/Kreisschlüssel der Kachellisten (Vermessungsverwaltung)
         "river_max": 294.0,                    # ebene DGM-Flächen unterhalb dieser Höhe gelten auch ohne Laser-Wasserpunkte als Fluss
     },
     "malgersdorf": {
-        "extent_km": (775, 778, 5381, 5384),       # Ortskern liegt in der Mitte (E 776–777, N 5382–5383)
-        "ags": "09277131",
+        # Malgersdorf (SW, um E 776, N 5382) bis Arnstorf (NO, E 780–782.5, N 5384–5387); der Nordwesten
+        # (Simbach) liegt im Lkr. Dingolfing-Landau, der Rest im Lkr. Rottal-Inn
+        "extent_km": (775, 783, 5381, 5387),
+        "ags": ["09277", "09279"],
         "river_max": None,
     },
 }

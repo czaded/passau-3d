@@ -1,1 +1,1 @@
-{"eMin": 772000.0, "nMax": 5387000.0, "cols": 451, "rows": 451, "step": 20, "widthKm": 9, "heightKm": 9, "hBase": 250.0, "hScale": 0.01, "originE": 776500.0, "originN": 5382500.0, "meanColor": [96.71626466666666, 103.1532951111111, 82.35287066666666], "waterCols": 0, "waterRows": 0}
+{"eMin": 772000.0, "nMax": 5390000.0, "cols": 701, "rows": 601, "step": 20, "widthKm": 14, "heightKm": 12, "hBase": 250.0, "hScale": 0.01, "originE": 779000.0, "originN": 5384000.0, "meanColor": [95.3572239, 101.7262863, 80.4052684], "waterCols": 0, "waterRows": 0}

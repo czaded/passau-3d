@@ -16,11 +16,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import AGS, E_MIN_KM, E_MAX_KM, N_MIN_KM, N_MAX_KM, data_dir  # noqa: E402
 
 UA = "Mozilla/5.0 (generic-client)"
+# Kachellisten je Gemeinde (8-stelliger Schlüssel) oder Landkreis (5-stellig); mehrere Listen werden vereinigt
 META = {
-    "lod2": f"https://geodaten.bayern.de/odd/a/lod2/citygml/meta/metalink/{AGS}.meta4",
-    "dgm1": f"https://geodaten.bayern.de/odd/a/dgm/dgm1/meta/metalink/{AGS}.meta4",
-    "dop20": f"https://geodaten.bayern.de/odd/a/dop20/meta/metalink/{AGS}.meta4",
-    "laser": f"https://geodaten.bayern.de/odd/a/laser/meta/metalink/{AGS}.meta4",
+    "lod2": "https://geodaten.bayern.de/odd/a/lod2/citygml/meta/metalink/{ags}.meta4",
+    "dgm1": "https://geodaten.bayern.de/odd/a/dgm/dgm1/meta/metalink/{ags}.meta4",
+    "dop20": "https://geodaten.bayern.de/odd/a/dop20/meta/metalink/{ags}.meta4",
+    "laser": "https://geodaten.bayern.de/odd/a/laser/meta/metalink/{ags}.meta4",
 }
 NS = {"m": "urn:ietf:params:xml:ns:metalink"}
 
@@ -33,12 +34,17 @@ def curl(url, dest):
     )
 
 
-def wanted(product, name):
+def tile_of(name):
     m = re.search(r"(\d{3})_(\d{4})", name)
-    e, n = int(m.group(1)), int(m.group(2))
-    if product == "lod2":  # 2-km-Kacheln, gerade km-Werte
-        return (e + 2 > E_MIN_KM and e < E_MAX_KM) and (n + 2 > N_MIN_KM and n < N_MAX_KM)
-    return E_MIN_KM <= e < E_MAX_KM and N_MIN_KM <= n < N_MAX_KM
+    return int(m.group(1)), int(m.group(2))
+
+
+def needed(product):
+    """Kacheln, die den Ausschnitt vollständig abdecken (LoD2: 2-km-Kacheln mit geraden km-Werten)."""
+    if product == "lod2":
+        return {(e, n) for e in range(E_MIN_KM - E_MIN_KM % 2, E_MAX_KM, 2)
+                for n in range(N_MIN_KM - N_MIN_KM % 2, N_MAX_KM, 2)}
+    return {(e, n) for e in range(E_MIN_KM, E_MAX_KM) for n in range(N_MIN_KM, N_MAX_KM)}
 
 
 def main(root):
@@ -49,22 +55,28 @@ def main(root):
         raw_dir = data_dir(root, "raw", product)
         os.makedirs(meta_dir, exist_ok=True)
         os.makedirs(raw_dir, exist_ok=True)
-        meta_file = os.path.join(meta_dir, f"{product}.meta4")
-        if not os.path.exists(meta_file):
-            curl(META[product], meta_file)
-        tree = etree.parse(meta_file)
-        for fe in tree.findall(".//m:file", NS):
-            name = fe.get("name")
-            if not re.fullmatch(r"[0-9_]+\.(gml|tif|laz)", name):
-                continue
-            if not wanted(product, name):
-                continue
-            size = int(fe.findtext("m:size", namespaces=NS) or 0)
-            url = fe.findtext("m:url", namespaces=NS)
-            dest = os.path.join(raw_dir, name)
-            if os.path.exists(dest) and os.path.getsize(dest) == size:
-                continue
-            jobs.append((product, name, url, dest, size))
+        want = needed(product)
+        seen = set()
+        for ags in AGS:
+            meta_file = os.path.join(meta_dir, f"{product}.meta4" if len(AGS) == 1 else f"{product}_{ags}.meta4")
+            if not os.path.exists(meta_file):
+                curl(META[product].format(ags=ags), meta_file)
+            for fe in etree.parse(meta_file).findall(".//m:file", NS):
+                name = fe.get("name")
+                if not re.fullmatch(r"[0-9_]+\.(gml|tif|laz)", name) or name in seen:
+                    continue
+                if tile_of(name) not in want:
+                    continue
+                seen.add(name)
+                size = int(fe.findtext("m:size", namespaces=NS) or 0)
+                url = fe.findtext("m:url", namespaces=NS)
+                dest = os.path.join(raw_dir, name)
+                if os.path.exists(dest) and os.path.getsize(dest) == size:
+                    continue
+                jobs.append((product, name, url, dest, size))
+        missing = sorted(want - {tile_of(nm) for nm in seen})
+        if missing:   # außerhalb Bayerns (Passau: Österreich) oder Nachbargemeinde/-kreis fehlt in config.py
+            print(f"Hinweis {product}: nicht in den Listen {AGS}: {missing}", flush=True)
 
     total = sum(j[4] for j in jobs)
     print(f"{len(jobs)} Dateien, {total / 1e6:.0f} MB zu laden", flush=True)

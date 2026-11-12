@@ -85,6 +85,9 @@ def download(root):
         # benannte Fließgewässer im Kern (für die Beschriftung, siehe 08_labels.py)
         overpass(f'[out:json][timeout:90];way["waterway"~"^(river|stream)$"]["name"]({bb});out geom tags;',
                  os.path.join(raw, "waterways.json"))
+        # Orts- und Dorfnamen (Beschriftung über dem Ort)
+        overpass(f'[out:json][timeout:60];node["place"~"^(town|village)$"]["name"]({bb});out;',
+                 os.path.join(raw, "places.json"))
     for f in ("streets.json", "companies2.json"):
         d = json.load(open(os.path.join(raw, f)))
         print(f"  {f}: {len(d['elements'])} Elemente (OSM-Stand {d.get('osm3s', {}).get('timestamp_osm_base', '?')})")

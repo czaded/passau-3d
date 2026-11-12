@@ -1,7 +1,7 @@
 #!/bin/bash
 # Baut das 3D-Modell vollständig neu.
 # Aufruf: ./build.sh              Passau (Download ~3,3 GB, Rechenzeit grob 10–15 min)
-#         ./build.sh malgersdorf  verstecktes Extra des Viewers (Download ~2,4 GB) -> viewer/places/malgersdorf
+#         ./build.sh malgersdorf  verstecktes Extra Malgersdorf–Arnstorf (Download ~8 GB) -> viewer/places/malgersdorf
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$PWD"

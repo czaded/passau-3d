@@ -83,11 +83,15 @@ def parse_file(path):
 
 
 def load_buildings(root, extent):
-    """Alle Gebäude, deren Grundriss-Schwerpunkt im Ausschnitt liegt (gecacht)."""
+    """Alle Gebäude, deren Grundriss-Schwerpunkt im Ausschnitt liegt (gecacht, gilt nur für denselben Ausschnitt)."""
     cache = data_dir(root, "work", "buildings.pkl")
+    extent = tuple(float(v) for v in extent)
     if os.path.exists(cache):
         with open(cache, "rb") as fh:
-            return pickle.load(fh)
+            cached = pickle.load(fh)
+        if isinstance(cached, dict) and cached.get("extent") == extent:
+            return cached["buildings"]
+        print("  Gebäude-Cache passt nicht zum Ausschnitt – neu einlesen", flush=True)
     e0, e1, n0, n1 = extent
     seen, out = set(), []
     for f in sorted(glob.glob(data_dir(root, "raw", "lod2", "*.gml"))):
@@ -110,5 +114,5 @@ def load_buildings(root, extent):
         print(f"  {os.path.basename(f)}: {len(bs)} Gebäude, {kept} im Ausschnitt", flush=True)
     os.makedirs(os.path.dirname(cache), exist_ok=True)
     with open(cache, "wb") as fh:
-        pickle.dump(out, fh, protocol=pickle.HIGHEST_PROTOCOL)
+        pickle.dump({"extent": extent, "buildings": out}, fh, protocol=pickle.HIGHEST_PROTOCOL)
     return out

@@ -1,17 +1,17 @@
 {
  "crs": "EPSG:25832 (ETRS89 / UTM 32N), H\u00f6hen DHHN2016",
  "eMin": 775000.0,
- "eMax": 778000.0,
+ "eMax": 783000.0,
  "nMin": 5381000.0,
- "nMax": 5384000.0,
- "originE": 776500.0,
- "originN": 5382500.0,
+ "nMax": 5387000.0,
+ "originE": 779000.0,
+ "originN": 5384000.0,
  "chunk": 500.0,
  "step": 2,
- "gridCols": 1501,
- "gridRows": 1501,
+ "gridCols": 4001,
+ "gridRows": 3001,
  "hBase": 250.0,
  "hScale": 0.01,
- "hMin": 387.04901123046875,
- "hMax": 460.66650390625
+ "hMin": 366.37200927734375,
+ "hMax": 470.5782775878906
 }

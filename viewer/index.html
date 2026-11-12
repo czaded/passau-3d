@@ -11,7 +11,8 @@
     font: 13px/1.45 -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
   #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
   #labels { position: fixed; inset: 0; pointer-events: none; }
-  .label { position: absolute; }
+  .label { position: absolute; transition: opacity .2s; }
+  .label.hidden { opacity: 0; }
   .label span { display: inline-block; transform: translateY(-14px); padding: 2px 8px 3px; border-radius: 999px;
     background: rgba(12,16,20,.62); border: 1px solid var(--line); font-size: 11.5px; letter-spacing: .01em; white-space: nowrap;
     backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
@@ -20,6 +21,10 @@
     letter-spacing: .32em; text-transform: uppercase; color: rgba(255,255,255,.82); text-shadow: 0 1px 6px rgba(0,30,50,.75); transform: none; }
   .label.river::after { display: none; }
   .label.stream span { font-size: 12px; letter-spacing: .24em; }
+  .label.town span { background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; font: 600 21px/1 Georgia, serif;
+    letter-spacing: .14em; text-transform: uppercase; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7), 0 0 14px rgba(0,0,0,.45); transform: none; }
+  .label.town::after { display: none; }
+  .label.village span { font-size: 15px; letter-spacing: .18em; }
   .panel { position: fixed; background: var(--glass); border: 1px solid var(--line); border-radius: 14px;
     backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }
   #hud { top: 16px; left: 16px; width: 286px; padding: 14px 16px 12px; }
@@ -117,7 +122,7 @@
 </button>
 <div id="compassText"></div>
 <div id="hint">Ziehen: verschieben · Rechte Maustaste: drehen · Scrollen: zoomen</div>
-<div id="credit">Datenquelle: <a href="https://www.geodaten.bayern.de" target="_blank" rel="noopener">Bayerische Vermessungsverwaltung – www.geodaten.bayern.de</a> (CC BY 4.0)<br>LoD2-Gebäude · DGM1 · DOP20 (Bildflug <span id="flight">29.06.2024</span>) · Laserpunkte · <span id="osmWhat">Straßennamen/Firmen</span>: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende</div>
+<div id="credit">Datenquelle: <a href="https://www.geodaten.bayern.de" target="_blank" rel="noopener">Bayerische Vermessungsverwaltung – www.geodaten.bayern.de</a> (CC BY 4.0)<br>LoD2-Gebäude · DGM1 · DOP20 (<span id="flight">Bildflug 29.06.2024</span>) · Laserpunkte · <span id="osmWhat">Straßennamen/Firmen</span>: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende</div>
 
 <div id="loader"><div class="box">
   <h2 id="loaderTitle">Passau</h2><p>3D-Modell wird aufgebaut …</p>

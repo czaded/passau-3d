@@ -2,7 +2,7 @@
 
 Interaktives 3D-Modell der Passauer Kernstadt (4 × 3 km, Hbf bis Dreiflüsseeck, Veste Oberhaus,
 Innstadt, Ilzstadt) plus 3 km Umgebungsring – vollständig aus amtlichen Geodaten abgeleitet.
-Verstecktes Extra: [Malgersdorf](#verstecktes-extra-malgersdorf) (dreimal auf den Titel „Passau“ klicken).
+Verstecktes Extra: [Malgersdorf bis Arnstorf](#verstecktes-extra-malgersdorf-bis-arnstorf) (dreimal auf den Titel „Passau“ klicken).
 
 ## Start
 
@@ -22,7 +22,7 @@ URL-Parameter: `view=overview|confluence|dom|oberhaus|postcard|innstadt|rathaus`
 Renderauflösung je Bildschirmpunkt; ohne Angabe regelt sie sich selbst), `lod=600` (Umschaltentfernung der
 Detailstufen in m), `veg=2` (grobes Kronendach), `tm=neutral|aces|agx`, `wtint=0..1` (Wasserfarbe:
 0 = reines Luftbild, Standard 0,85), `flow=2.4` (Strömungstempo), `cam=E,N,H,E,N,H` (Kamera/Ziel in UTM32),
-`ort=malgersdorf` (verstecktes Extra, eigene Ansichten `view=overview|village|church|chapel|school|north`).
+`ort=malgersdorf` (verstecktes Extra, eigene Ansichten `view=overview|village|church|valley|arnstorf|georg|simbach`).
 
 ### Bildrate
 
@@ -31,6 +31,11 @@ Detailstufen in m), `veg=2` (grobes Kronendach), `tm=neutral|aces|agx`, `wtint=0
 - Schattenkarte und Spiegelbild werden nur neu gerechnet, wenn sich Kamera, Sonnenstand oder Schalter
   ändern; die Umgebungsverdeckung läuft in halber Auflösung direkt aus der Tiefe.
 - Gelände (2 / 4 / 10 m), Kronendach und Bäume haben entfernungsabhängige Detailstufen.
+- Luftbilder werden nachgeladen (`viewer/src/ortho.js`): je Kachel immer 512 px, näher an der Kamera
+  1024 bzw. 2048 px – gewählt nach Bodenauflösung je Bildschirmpixel, mit Obergrenze. Das hält den
+  Grafikspeicher auch beim großen Ausschnitt Malgersdorf–Arnstorf (192 Kacheln) klein.
+- Überdecken sich Beschriftungen im Bild, bleibt die wichtigere sichtbar (Ort > Gebäude > Gewässer);
+  die anderen erscheinen beim Hineinzoomen.
 - Gemessen auf einem MacBook mit M4 Pro (Chrome, Fenster 1600 × 950): 59–60 Bilder/s bei 3200 × 1900
   Renderauflösung, auch beim Drehen der Ansicht. Vor der Umstellung: 46 Bilder/s bei 1600 × 950.
 
@@ -90,30 +95,36 @@ mit Marke sowie eine kurze Namensliste); Name und Lage kommen ausschließlich au
   einzelne Bäume/Baustellen können zwischen beiden Ständen abweichen.
 - Luftbild 20 cm/px: aus großer Nähe unscharf.
 
-## Verstecktes Extra: Malgersdorf
+## Verstecktes Extra: Malgersdorf bis Arnstorf
 
 Dreimal schnell auf den Ortsnamen oben links klicken (oder `?ort=malgersdorf` anhängen): Der Viewer lädt
-Malgersdorf (Landkreis Rottal-Inn) – gleiche Datenquellen, gleiche Pipeline, gleiche Darstellung.
-Derselbe Dreifachklick auf „Malgersdorf“ führt zurück nach Passau.
+das Gebiet von Malgersdorf bis Arnstorf (Landkreis Rottal-Inn) – gleiche Datenquellen, gleiche Pipeline,
+gleiche Darstellung. Derselbe Dreifachklick auf „Malgersdorf – Arnstorf“ führt zurück nach Passau.
 
-- Ausschnitt 3 × 3 km (UTM32 E 775–778 km, N 5381–5384 km, Ortskern in der Mitte) plus 3 km Umgebungsring.
-- 1.392 Gebäude (LoD2), 2.973 Einzelbäume + 9.535 Bestandsbäume (Laser), 3 Gebäudebeschriftungen mit den
-  amtlichen LoD2-Namen (St. Stephanus, St. Maria Auxiliatrix, Grundschule).
-- Aus OpenStreetMap: 41 Straßennamen (51 Beschriftungspunkte) und die Gewässernamen Kollbach und Embach
-  (Lage des Laufs aus OSM). Die Firmen-Auswahlregeln ergeben dort keinen Treffer.
-- Luftbild: Bildflug 11.05.2024. Sonnenstand für den 11. Mai; Standardzeit 10:00 Uhr, dann decken sich
-  berechnete und fotografierte Schatten (visuell am Kirchturm St. Stephanus abgeglichen).
-- Keine Wasserfläche erkannt (keine ebene DGM-Fläche ab 2.000 m² mit Laser-Wasserpunkten; die Bäche sind
-  dafür zu schmal), daher keine Wasserdarstellung, keine Spiegelung, keine Brücken und Schiffe. Schalter
-  ohne Wirkung (Spiegelung, Firmen) sind dort ausgeblendet.
+- Ausschnitt 8 × 6 km (UTM32 E 775–783 km, N 5381–5387 km) plus 3 km Umgebungsring: Malgersdorf im
+  Südwesten, Arnstorf im Nordosten, dazwischen das Kollbachtal; im Nordwesten Simbach (Lkr. Dingolfing-Landau).
+  Kachellisten der Landkreise Rottal-Inn (09277) und Dingolfing-Landau (09279).
+- 8.779 Gebäude (LoD2), 19.091 Einzelbäume + 53.958 Bestandsbäume (Laser).
+- 15 Gebäudebeschriftungen mit den amtlichen LoD2-Namen (u. a. St. Stephanus, St. Georg, Maria Schnee,
+  St. Bartholomäus; „Sitz d. Verwaltung-Gemeinde …“ als „Rathaus Arnstorf/Simbach“).
+- Aus OpenStreetMap: 293 Straßennamen (372 Beschriftungspunkte), 7 Ortsnamen (Arnstorf, Malgersdorf,
+  Simbach, Jägerndorf, Holzham, Hainberg, Langgraben), die Gewässernamen Kollbach, Simbach, Embach,
+  Steinbach und Zeller Bach sowie 3 Firmen (Lindner Group, Vertiv Integrated Systems, Schlossbräu Mariakirchen).
+- Luftbild aus drei Bildflügen: 11.05.2024 (Süden mit Malgersdorf), 19.06.2024 (Arnstorf),
+  11.08.2024 (Simbach). An den Grenzen wechseln daher Jahreszeit und Schattenrichtung im Luftbild.
+  Sonnenstand für den 11. Mai, Standardzeit 10:00 Uhr (in Malgersdorf am Kirchturm St. Stephanus
+  abgeglichen; in Arnstorf und Simbach nicht geprüft).
+- Keine Wasserfläche erkannt (die Bäche sind zu schmal), daher keine Wasserdarstellung, keine Spiegelung,
+  keine Brücken und Schiffe; der Schalter Spiegelung ist dort ausgeblendet.
 - Fassadenfarben, Fenster und Baumformen sind wie in Passau prozedural (nicht real).
-- Daten: `viewer/places/malgersdorf/` (58 MB), Ortseinstellungen: `viewer/src/places.js` und `pipeline/config.py`.
+- Daten: `viewer/places/malgersdorf/` (358 MB, davon beim Start geladen ~140 MB; die 1024/2048-px-Luftbilder
+  kommen nach Bedarf). Ortseinstellungen: `viewer/src/places.js` und `pipeline/config.py`.
 
 ## Neu bauen
 
 ```bash
 ./build.sh             # Passau: Download ~3,3 GB; Rechenzeit grob 10–15 min (nicht am Stück gemessen)
-./build.sh malgersdorf # verstecktes Extra: Download ~2,4 GB -> viewer/places/malgersdorf/
+./build.sh malgersdorf # verstecktes Extra Malgersdorf–Arnstorf: Download ~8 GB -> viewer/places/malgersdorf/
 ```
 
 | Schritt | Ergebnis |
@@ -128,18 +139,19 @@ Derselbe Dreifachklick auf „Malgersdorf“ führt zurück nach Passau.
 | `12_boats.py` | Schiffe: Wassermaske ohne Schiffe/Stege, 3D-Schiffskörper (läuft nach 07) |
 | `08_labels.py` | Beschriftungen |
 | `09_context.py` | Umgebungsring |
-| `10_finalize.py` | Build-Stempel |
+| `10_finalize.py` | Luftbild-Stufen 512/1024 px, Build-Stempel |
 | `11_osm.py download/build` | Straßennamen (399 Beschriftungspunkte) und Firmen (26) aus OSM |
 
-Die Zahlen in der Tabelle gelten für Passau. Für Malgersdorf entfallen `07_bridges.py` und `12_boats.py`.
+Die Zahlen in der Tabelle gelten für Passau. Für Malgersdorf–Arnstorf entfallen `07_bridges.py` und `12_boats.py`.
 Ausschnitt ändern oder weiteren Ort anlegen: `pipeline/config.py` (volle km, Kachelraster, Gemeindeschlüssel)
-und `viewer/src/places.js` (Titel, Kameraansichten, Sonnenstand).
+und `viewer/src/places.js` (Titel, Kameraansichten, Sonnenstand). Für Kacheln einer Nachbargemeinde oder
+eines Nachbarlandkreises dessen Schlüssel ergänzen; `01_download.py` meldet fehlende Kacheln.
 
 ## Ordner
 
-- `viewer/` – Three.js-Viewer (r187, lokal unter `viewer/vendor`), Daten in `viewer/data/` (150 MB)
+- `viewer/` – Three.js-Viewer (r187, lokal unter `viewer/vendor`), Daten in `viewer/data/` (162 MB)
 - `pipeline/` – Python-Pipeline
 - `data/raw/` (3,3 GB Rohdaten), `data/work/` (1 GB Zwischenstände), `data/shots/` (Test-Screenshots)
   – nur für den Neuaufbau nötig, können gelöscht werden.
-- `viewer/places/malgersdorf/` – Daten des versteckten Extras; `data/places/malgersdorf/` (2,4 GB Rohdaten,
-  0,7 GB Zwischenstände) – nur für dessen Neuaufbau nötig, kann gelöscht werden.
+- `viewer/places/malgersdorf/` – Daten des versteckten Extras; `data/places/malgersdorf/` (8,2 GB Rohdaten,
+  3,5 GB Zwischenstände) – nur für dessen Neuaufbau nötig, kann gelöscht werden.

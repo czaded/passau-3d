@@ -1,6 +1,7 @@
 // Gelände (DGM1), Wasserflächen-Shader, Vegetations-Kronendach (Laser), Sockel.
 import * as THREE from 'three';
 import { WATER_GLSL, patchWaterFragment } from './water.js';
+import { OrthoStream } from './ortho.js';
 
 export const GRADE_GLSL = /* glsl */`
 uniform vec3 uGrade; // x Sättigung, y Gamma, z Gain
@@ -166,24 +167,9 @@ export async function loadTerrain(ctx, progress) {
   ctx.uniforms.uWaterLevel.value = layers.waterLevel;
   ctx.uniforms.uExtent.value.set(minX, minZ, 1 / width, 1 / depth);
 
-  // Luftbild-Texturen je Chunk
-  const loader = new THREE.TextureLoader();
-  const aniso = ctx.renderer.capabilities.getMaxAnisotropy();
-  ctx.ortho = [];
-  let done = 0;
-  const texJobs = [];
-  for (let j = 0; j < nz; j++) {
-    for (let i = 0; i < nx; i++) {
-      texJobs.push(loader.loadAsync(ctx.url(`ortho/${i}_${j}.jpg`)).then((t) => {
-        t.colorSpace = THREE.SRGBColorSpace;
-        t.anisotropy = aniso;
-        t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-        ctx.ortho[j * nx + i] = t;
-        progress(0.1 + 0.5 * (++done / (nx * nz)), 'Luftbild');
-      }));
-    }
-  }
-  await Promise.all(texJobs);
+  // Luftbild-Texturen je Chunk: Grundstufe sofort, Detailstufen je nach Kameraabstand (ortho.js)
+  ctx.orthoStream = new OrthoStream(ctx, { nx, nz, chunk, minX, minZ, tiered: !!ctx.build.orthoTiers });
+  ctx.ortho = await ctx.orthoStream.loadBase(progress);
 
   // ---- Geländenetze: je Chunk drei Detailstufen (2 m / 4 m / 10 m; gröbere mit Randschürze gegen Spalten)
   const group = new THREE.Group();
@@ -276,6 +262,7 @@ export async function loadTerrain(ctx, progress) {
   for (let j = 0; j < nz; j++) {
     for (let i = 0; i < nx; i++) {
       const mat = makeTerrainMaterial(ctx, ctx.ortho[j * nx + i]);
+      ctx.orthoStream.use(j * nx + i, mat);
       const meshes = [1, 2, 5].map((stride) => new THREE.Mesh(buildChunk(i, j, stride), mat));
       // renderOrder: Gelände nach Gebäuden und Vegetation zeichnen -> verdeckte Bodenpixel werden nicht berechnet
       for (const m of meshes) { m.receiveShadow = true; m.castShadow = true; m.renderOrder = 10; m.material.side = THREE.DoubleSide; m.material.shadowSide = THREE.FrontSide; }
@@ -396,6 +383,7 @@ export async function loadTerrain(ctx, progress) {
   for (let j = 0; j < nz; j++) {
     for (let i = 0; i < nx; i++) {
       const mat = makeCanopyMaterial(ctx, ctx.ortho[j * nx + i]);
+      ctx.orthoStream.use(j * nx + i, mat);
       const meshes = levels.map((lv) => {
         const geo = lv(i, j);
         if (!geo) return null;

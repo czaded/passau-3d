@@ -316,7 +316,9 @@ export async function loadBuildings(ctx, progress) {
       geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
       geo.computeVertexNormals();
       geo.computeBoundingSphere();
-      const mesh = new THREE.Mesh(geo, makeRoofMaterial(ctx, ctx.ortho[c.j * nx + c.i]));
+      const roofMat = makeRoofMaterial(ctx, ctx.ortho[c.j * nx + c.i]);
+      ctx.orthoStream.use(c.j * nx + c.i, roofMat);
+      const mesh = new THREE.Mesh(geo, roofMat);
       mesh.castShadow = mesh.receiveShadow = true;
       group.add(mesh);
       roofTris += c.roof.verts / 3;

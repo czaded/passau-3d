@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Beschriftungen: benannte LoD2-Gebäude (amtliche Namen) + Gewässer (Passau: Flüsse und Dreiflüsseeck
-aus der Wassermaske; andere Orte: benannte Fließgewässer aus OpenStreetMap).
+aus der Wassermaske; andere Orte: benannte Fließgewässer und Ortsnamen aus OpenStreetMap).
 
 Positionen stammen aus den Daten (Gebäudeschwerpunkt/-höhe, Wassermaske), nicht aus Schätzwerten.
 
@@ -36,11 +36,24 @@ PICK = {
         "St. Salvator": "St. Salvator",
         "Römermuseum Kastell Boiotro": "Kastell Boiotro",
     },
-    "malgersdorf": {
-        "St. Stephanus": "St. Stephanus",
-        "St. Maria Auxiliatrix": "St. Maria Auxiliatrix",
-        "Grundschule": "Grundschule",
-    },
+    # Malgersdorf bis Arnstorf: gleiche Namen kommen mehrfach vor -> (Name, Anzeige, Nähe-Punkt E/N)
+    "malgersdorf": [
+        ("St. Stephanus", "St. Stephanus", None),
+        ("St. Maria Auxiliatrix", "St. Maria Auxiliatrix", None),
+        ("Grundschule", "Grundschule Malgersdorf", (776500, 5382450)),
+        ("St. Georg", "St. Georg", None),
+        ("Maria Schnee", "Maria Schnee", None),
+        ("Sitz d.Verwaltung-Gemeinde Arnstorf", "Rathaus Arnstorf", None),
+        ("Closen-Mittelschule und Realschule", "Closen-Mittel- und Realschule", None),
+        ("St. Bartholomäus", "St. Bartholomäus", None),
+        ("Sitz d.Verwaltung-Gemeinde Simbach", "Rathaus Simbach", None),
+        ("St. Michael", "St. Michael", None),
+        ("St. Jakobus der Ältere", "St. Jakobus", None),
+        ("St. Petrus", "St. Petrus", None),
+        ("St. Johannes der Täufer", "St. Johannes", None),
+        ("Maria Namen", "Maria Namen", None),
+        ("St. Ruppert", "St. Ruppert", None),
+    ],
 }
 
 
@@ -84,7 +97,7 @@ def passau_waters(labels, work, dgm):
 
 def osm_waterways(root, labels, dgm):
     """Benannte Fließgewässer aus OpenStreetMap (11_osm.py download): Name auf der Mitte des Laufs im Kern,
-    bei langen Läufen etwa alle 1,5 km."""
+    bei langen Läufen etwa alle 2 km."""
     path = data_dir(root, "raw", "osm", "waterways.json")
     if not os.path.exists(path):
         print("  keine Gewässernamen (11_osm.py download noch nicht gelaufen)")
@@ -108,9 +121,11 @@ def osm_waterways(root, labels, dgm):
         for line in getattr(merged, "geoms", [merged]):
             if line.geom_type != "LineString" or line.length < 300:
                 continue
-            k = max(1, int(line.length // 1500))
+            k = max(1, int(line.length // 2000))
             for i in range(k):
                 p = line.interpolate((i + 0.5) / k * line.length)
+                if any(x["label"] == name and np.hypot(x["e"] - p.x, x["n"] - p.y) < 1200 for x in labels):
+                    continue                                   # Nebenarme/Teilstücke: nicht doppelt beschriften
                 r = int(np.clip(N_MAX - p.y, 0, dgm.shape[0] - 1))
                 c = int(np.clip(p.x - E_MIN, 0, dgm.shape[1] - 1))
                 labels.append({"label": name, "e": round(p.x, 1), "n": round(p.y, 1), "h": float(dgm[r, c]) + 1.0,
@@ -118,17 +133,40 @@ def osm_waterways(root, labels, dgm):
             print(f"  {name}: {line.length:.0f} m im Kern, {k} Beschriftung(en)")
 
 
+def osm_places(root, labels, dgm):
+    """Orts- und Dorfnamen (OSM place=town/village) im Kern, schwebend über dem Ortspunkt."""
+    path = data_dir(root, "raw", "osm", "places.json")
+    if not os.path.exists(path):
+        return
+    from pyproj import Transformer
+    to_utm = Transformer.from_crs(4326, 25832, always_xy=True)
+    for el in json.load(open(path))["elements"]:
+        t = el.get("tags", {})
+        e, n = to_utm.transform(el["lon"], el["lat"])
+        if not (E_MIN + 150 <= e < E_MAX - 150 and N_MIN + 150 <= n < N_MAX - 150) or not t.get("name"):
+            continue
+        r, c = int(N_MAX - n), int(e - E_MIN)
+        labels.append({"label": t["name"], "e": round(e, 1), "n": round(n, 1), "h": float(dgm[r, c]) + 150.0,
+                       "kind": "town" if t.get("place") == "town" else "town village"})
+        print(f"  Ort: {t['name']} ({t.get('place')})")
+
+
 def main(root):
     out = viewer_dir(root)
     work = data_dir(root, "work")
     lm = json.load(open(os.path.join(out, "landmarks_lod2.json")))
     labels = []
-    for name, label in PICK[PLACE].items():
+    pick = PICK[PLACE]
+    pick = [(k, v, None) for k, v in pick.items()] if isinstance(pick, dict) else pick
+    for name, label, near in pick:
         cands = [x for x in lm if x["name"] == name]
         if not cands:
             print("  nicht gefunden:", name)
             continue
-        best = max(cands, key=lambda x: x["h"])
+        if near:
+            best = min(cands, key=lambda x: np.hypot(x["e"] - near[0], x["n"] - near[1]))
+        else:
+            best = max(cands, key=lambda x: x["h"])
         labels.append({"label": label, "e": best["e"], "n": best["n"], "h": best["top"] + 6, "kind": "place"})
 
     dgm = np.load(os.path.join(work, "dgm1.npy"))
@@ -136,6 +174,7 @@ def main(root):
         passau_waters(labels, work, dgm)
     else:
         osm_waterways(root, labels, dgm)
+        osm_places(root, labels, dgm)
 
     with open(os.path.join(out, "labels.json"), "w") as fh:
         json.dump(labels, fh, ensure_ascii=False, indent=1)

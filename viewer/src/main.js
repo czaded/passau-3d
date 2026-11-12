@@ -128,6 +128,8 @@ ctx.setClock = setClock;
 async function loadLabels() {
   const list = await fetch(ctx.url('labels.json')).then((r) => (r.ok ? r.json() : [])).catch(() => []);
   const group = new THREE.Group();
+  const rank = (kind = '') => (kind === 'town' ? 0 : kind.startsWith('town') ? 1 : kind.startsWith('river') ? 3 : 2);
+  ctx.labelItems = [];
   for (const l of list) {
     const el = document.createElement('div');
     el.className = `label ${l.kind || ''}`;
@@ -136,7 +138,9 @@ async function loadLabels() {
     o.position.copy(U(l.e, l.n, l.h));
     o.center.set(0.5, 1);
     group.add(o);
+    ctx.labelItems.push({ el, span: el.firstChild, rank: rank(l.kind) });
   }
+  ctx.labelItems.sort((a, b) => a.rank - b.rank);           // stabil: innerhalb einer Art gilt die Dateireihenfolge
   group.visible = ctx.settings.labels;
   scene.add(group);
   ctx.labelGroup = group;
@@ -147,6 +151,7 @@ async function init() {
   // Build-Stempel der Pipeline an alle Daten-URLs hängen (verhindert veraltete Cache-Stände)
   const build = await fetch(`${place.data}/build.json`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
   ctx.url = (p) => `${place.data}/${p}?v=${build.stamp || 0}`;
+  ctx.build = build;
   await loadTerrain(ctx, progress);
   E0 = ctx.meta.originE; N0 = ctx.meta.originN;
   await loadBuildings(ctx, progress);
@@ -163,6 +168,8 @@ async function init() {
     const v = params.get('cam').split(',').map(Number);
     camera.position.copy(U(v[0], v[1], v[2])); controls.target.copy(U(v[3], v[4], v[5])); controls.update();
   }
+  progress(0.97, 'Luftbild-Details');
+  await ctx.orthoStream.ready(camera);
   progress(1, 'Fertig');
   renderer.compile(scene, camera);
   requestAnimationFrame(() => { $('loader').classList.add('done'); ctx.ready = true; });
@@ -281,6 +288,20 @@ function autoResolution(fps) {
     } else res.good = 0;
   }
 }
+// Beschriftungen, die sich im Bild überdecken: die wichtigere bleibt sichtbar (Ort > Gebäude > Gewässer)
+let lastDeclutter = -1;
+function declutterLabels() {
+  const placed = [];
+  for (const it of ctx.labelItems) {
+    if (it.el.style.display === 'none') continue;
+    const r = it.span.getBoundingClientRect();
+    // nur deutliche Überdeckung zählt (leichtes Anstoßen bleibt lesbar)
+    const hit = placed.some((p) => Math.min(r.right, p.right) - Math.max(r.left, p.left) > 8
+      && Math.min(r.bottom, p.bottom) - Math.max(r.top, p.top) > 6);
+    it.el.classList.toggle('hidden', hit);
+    if (!hit) placed.push(r);
+  }
+}
 function frame() {
   timer.update();
   const dt = Math.min(timer.getDelta(), 0.1), t = timer.getElapsed();
@@ -313,6 +334,7 @@ function frame() {
   camera.near = Math.max(2, dist * 0.02);
   camera.far = 200000;
   camera.updateProjectionMatrix();
+  ctx.orthoStream.update(camera);
   atmosphere.update(t, camera, controls.target);
   ctx.water.update(renderer, scene, camera, t);
   // Schattenkarte: nur bei geändertem Ausschnitt, Sonnenstand, Detailstufen oder Schaltern neu rechnen
@@ -324,7 +346,10 @@ function frame() {
   }
   post.render();
   lodSig = lodSignature();
-  if (ctx.settings.labels && ctx.labelGroup) labelRenderer.render(scene, camera);
+  if (ctx.settings.labels && ctx.labelGroup) {
+    labelRenderer.render(scene, camera);
+    if (t - lastDeclutter > 0.25) { lastDeclutter = t; declutterLabels(); }
+  }
   ctx.overlay.update(camera);
   fpsAcc += dt; fpsN++;
   if (fpsAcc > 0.5) {
