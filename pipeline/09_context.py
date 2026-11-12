@@ -20,6 +20,7 @@ from scipy import ndimage as ndi
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import (E_MIN_KM, E_MAX_KM, N_MIN_KM, N_MAX_KM, ORIGIN_E, ORIGIN_N)  # noqa: E402
+from config import data_dir, viewer_dir  # noqa: E402
 
 RING = 3                       # km um den Kern
 CE0, CE1 = E_MIN_KM - RING, E_MAX_KM + RING
@@ -44,7 +45,7 @@ def tiles():
 def download(root):
     jobs = []
     for product, url in URLS.items():
-        d = os.path.join(root, "data", "raw", f"context_{product}")
+        d = data_dir(root, "raw", f"context_{product}")
         os.makedirs(d, exist_ok=True)
         for e, n in tiles():
             dest = os.path.join(d, f"{e}_{n}.tif")
@@ -69,7 +70,7 @@ def download(root):
 
 
 def build(root):
-    out = os.path.join(root, "viewer", "data")
+    out = viewer_dir(root)
     w_km, h_km = CE1 - CE0, CN1 - CN0
     cols, rows = w_km * 1000 // H_STEP + 1, h_km * 1000 // H_STEP + 1
     heights = np.full((rows, cols), np.nan, np.float32)
@@ -82,7 +83,7 @@ def build(root):
     exact = np.zeros(z2.shape, bool)
     for e, n in tiles():
         ti, tj = e - CE0, CN1 - 1 - n
-        f = os.path.join(root, "data", "raw", "context_dgm1", f"{e}_{n}.tif")
+        f = data_dir(root, "raw", "context_dgm1", f"{e}_{n}.tif")
         if os.path.exists(f):
             with tifffile.TiffFile(f) as t:
                 page = t.pages[0]
@@ -114,7 +115,7 @@ def build(root):
                 bmin, bmax = np.nanmin(b2, axis=(1, 3)), np.nanmax(b2, axis=(1, 3))
             z2[tj * 500:(tj + 1) * 500, ti * 500:(ti + 1) * 500] = bmin
             exact[tj * 500:(tj + 1) * 500, ti * 500:(ti + 1) * 500] = (bmax - bmin) < 0.012
-        f = os.path.join(root, "data", "raw", "context_dop40", f"{e}_{n}.tif")
+        f = data_dir(root, "raw", "context_dop40", f"{e}_{n}.tif")
         if os.path.exists(f):
             with tifffile.TiffFile(f) as t:
                 page = t.pages[0]
@@ -159,8 +160,13 @@ def build(root):
         print(f"  Kandidat: {area[k] / 1e4:6.1f} ha, exakt eben {100 * frac[k]:3.0f} %, "
               f"Höhe {np.median(zf[lab == k + 1]):.1f} m -> {'Wasser' if keep[k + 1] else 'verworfen'}")
     cwater = ndi.binary_closing(keep[lab], iterations=2)
-    soft = ndi.gaussian_filter(cwater.reshape(h_km * 250, 2, w_km * 250, 2).mean(axis=(1, 3)).astype(np.float32), 1.0)
-    np.clip(np.round(soft * 255), 0, 255).astype(np.uint8).tofile(os.path.join(out, "context_water.bin"))
+    has_water = bool(cwater.any())
+    water_path = os.path.join(out, "context_water.bin")
+    if has_water:
+        soft = ndi.gaussian_filter(cwater.reshape(h_km * 250, 2, w_km * 250, 2).mean(axis=(1, 3)).astype(np.float32), 1.0)
+        np.clip(np.round(soft * 255), 0, 255).astype(np.uint8).tofile(water_path)
+    elif os.path.exists(water_path):
+        os.remove(water_path)                                # kein Wasser im Ring: keine Maske (waterCols = 0)
     print(f"Wasser im Ring: {cwater.sum() * 4 / 1e6:.2f} km²")
 
     mean = tex[tex.sum(axis=2) > 0].reshape(-1, 3).mean(axis=0) if n_dop else np.array([90, 100, 70])
@@ -168,7 +174,7 @@ def build(root):
         "eMin": CE0 * 1000.0, "nMax": CN1 * 1000.0, "cols": int(cols), "rows": int(rows), "step": H_STEP,
         "widthKm": w_km, "heightKm": h_km, "hBase": 250.0, "hScale": 0.01,
         "originE": ORIGIN_E, "originN": ORIGIN_N, "meanColor": [float(v) for v in mean],
-        "waterCols": w_km * 250, "waterRows": h_km * 250,
+        "waterCols": w_km * 250 if has_water else 0, "waterRows": h_km * 250 if has_water else 0,
     }
     with open(os.path.join(out, "context.json"), "w") as fh:
         json.dump(meta, fh)

@@ -2,6 +2,7 @@
 
 Interaktives 3D-Modell der Passauer Kernstadt (4 × 3 km, Hbf bis Dreiflüsseeck, Veste Oberhaus,
 Innstadt, Ilzstadt) plus 3 km Umgebungsring – vollständig aus amtlichen Geodaten abgeleitet.
+Verstecktes Extra: [Malgersdorf](#verstecktes-extra-malgersdorf) (dreimal auf den Titel „Passau“ klicken).
 
 ## Start
 
@@ -20,7 +21,8 @@ URL-Parameter: `view=overview|confluence|dom|oberhaus|postcard|innstadt|rathaus`
 `labels=0`, `streets=0`, `companies=0`, `ui=0`, `ao=0`, `refl=0` (Spiegelung aus), `pr=1.5` (feste
 Renderauflösung je Bildschirmpunkt; ohne Angabe regelt sie sich selbst), `lod=600` (Umschaltentfernung der
 Detailstufen in m), `veg=2` (grobes Kronendach), `tm=neutral|aces|agx`, `wtint=0..1` (Wasserfarbe:
-0 = reines Luftbild, Standard 0,85), `flow=2.4` (Strömungstempo), `cam=E,N,H,E,N,H` (Kamera/Ziel in UTM32).
+0 = reines Luftbild, Standard 0,85), `flow=2.4` (Strömungstempo), `cam=E,N,H,E,N,H` (Kamera/Ziel in UTM32),
+`ort=malgersdorf` (verstecktes Extra, eigene Ansichten `view=overview|village|church|chapel|school|north`).
 
 ### Bildrate
 
@@ -88,10 +90,30 @@ mit Marke sowie eine kurze Namensliste); Name und Lage kommen ausschließlich au
   einzelne Bäume/Baustellen können zwischen beiden Ständen abweichen.
 - Luftbild 20 cm/px: aus großer Nähe unscharf.
 
+## Verstecktes Extra: Malgersdorf
+
+Dreimal schnell auf den Ortsnamen oben links klicken (oder `?ort=malgersdorf` anhängen): Der Viewer lädt
+Malgersdorf (Landkreis Rottal-Inn) – gleiche Datenquellen, gleiche Pipeline, gleiche Darstellung.
+Derselbe Dreifachklick auf „Malgersdorf“ führt zurück nach Passau.
+
+- Ausschnitt 3 × 3 km (UTM32 E 775–778 km, N 5381–5384 km, Ortskern in der Mitte) plus 3 km Umgebungsring.
+- 1.392 Gebäude (LoD2), 2.973 Einzelbäume + 9.535 Bestandsbäume (Laser), 3 Gebäudebeschriftungen mit den
+  amtlichen LoD2-Namen (St. Stephanus, St. Maria Auxiliatrix, Grundschule).
+- Aus OpenStreetMap: 41 Straßennamen (51 Beschriftungspunkte) und die Gewässernamen Kollbach und Embach
+  (Lage des Laufs aus OSM). Die Firmen-Auswahlregeln ergeben dort keinen Treffer.
+- Luftbild: Bildflug 11.05.2024. Sonnenstand für den 11. Mai; Standardzeit 10:00 Uhr, dann decken sich
+  berechnete und fotografierte Schatten (visuell am Kirchturm St. Stephanus abgeglichen).
+- Keine Wasserfläche erkannt (keine ebene DGM-Fläche ab 2.000 m² mit Laser-Wasserpunkten; die Bäche sind
+  dafür zu schmal), daher keine Wasserdarstellung, keine Spiegelung, keine Brücken und Schiffe. Schalter
+  ohne Wirkung (Spiegelung, Firmen) sind dort ausgeblendet.
+- Fassadenfarben, Fenster und Baumformen sind wie in Passau prozedural (nicht real).
+- Daten: `viewer/places/malgersdorf/` (58 MB), Ortseinstellungen: `viewer/src/places.js` und `pipeline/config.py`.
+
 ## Neu bauen
 
 ```bash
-./build.sh             # Download ~3,3 GB; Rechenzeit grob 10–15 min (nicht am Stück gemessen)
+./build.sh             # Passau: Download ~3,3 GB; Rechenzeit grob 10–15 min (nicht am Stück gemessen)
+./build.sh malgersdorf # verstecktes Extra: Download ~2,4 GB -> viewer/places/malgersdorf/
 ```
 
 | Schritt | Ergebnis |
@@ -109,7 +131,9 @@ mit Marke sowie eine kurze Namensliste); Name und Lage kommen ausschließlich au
 | `10_finalize.py` | Build-Stempel |
 | `11_osm.py download/build` | Straßennamen (399 Beschriftungspunkte) und Firmen (26) aus OSM |
 
-Ausschnitt ändern: `pipeline/config.py` (volle km, Kachelraster).
+Die Zahlen in der Tabelle gelten für Passau. Für Malgersdorf entfallen `07_bridges.py` und `12_boats.py`.
+Ausschnitt ändern oder weiteren Ort anlegen: `pipeline/config.py` (volle km, Kachelraster, Gemeindeschlüssel)
+und `viewer/src/places.js` (Titel, Kameraansichten, Sonnenstand).
 
 ## Ordner
 
@@ -117,3 +141,5 @@ Ausschnitt ändern: `pipeline/config.py` (volle km, Kachelraster).
 - `pipeline/` – Python-Pipeline
 - `data/raw/` (3,3 GB Rohdaten), `data/work/` (1 GB Zwischenstände), `data/shots/` (Test-Screenshots)
   – nur für den Neuaufbau nötig, können gelöscht werden.
+- `viewer/places/malgersdorf/` – Daten des versteckten Extras; `data/places/malgersdorf/` (2,4 GB Rohdaten,
+  0,7 GB Zwischenstände) – nur für dessen Neuaufbau nötig, kann gelöscht werden.

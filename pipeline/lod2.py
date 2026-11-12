@@ -6,6 +6,8 @@ import pickle
 import numpy as np
 from lxml import etree
 
+from config import data_dir
+
 BLDG = "http://www.opengis.net/citygml/building/1.0"
 GML = "http://www.opengis.net/gml"
 GEN = "http://www.opengis.net/citygml/generics/1.0"
@@ -82,13 +84,13 @@ def parse_file(path):
 
 def load_buildings(root, extent):
     """Alle Gebäude, deren Grundriss-Schwerpunkt im Ausschnitt liegt (gecacht)."""
-    cache = os.path.join(root, "data", "work", "buildings.pkl")
+    cache = data_dir(root, "work", "buildings.pkl")
     if os.path.exists(cache):
         with open(cache, "rb") as fh:
             return pickle.load(fh)
     e0, e1, n0, n1 = extent
     seen, out = set(), []
-    for f in sorted(glob.glob(os.path.join(root, "data", "raw", "lod2", "*.gml"))):
+    for f in sorted(glob.glob(data_dir(root, "raw", "lod2", "*.gml"))):
         bs = parse_file(f)
         kept = 0
         for b in bs:

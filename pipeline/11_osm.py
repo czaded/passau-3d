@@ -18,10 +18,11 @@ from shapely.ops import linemerge
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import (E_MIN, E_MAX, N_MIN, N_MAX)  # noqa: E402
+from config import PLACE, data_dir, viewer_dir  # noqa: E402
 
 UA = "city-model-osm-fetch/1.0 (one-off label download)"   # generisch, ohne persönliche Angaben
-HOSTS = ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter",
-         "https://overpass.kumi.systems/api/interpreter"]
+HOSTS = ["https://overpass-api.de/api/interpreter", "https://overpass.openstreetmap.fr/api/interpreter",
+         "https://overpass.private.coffee/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
 TO_LL = Transformer.from_crs(25832, 4326, always_xy=True)
 TO_UTM = Transformer.from_crs(4326, 25832, always_xy=True)
 
@@ -63,7 +64,7 @@ def overpass(query, dest):
 
 
 def download(root):
-    raw = os.path.join(root, "data", "raw", "osm")
+    raw = data_dir(root, "raw", "osm")
     os.makedirs(raw, exist_ok=True)
     s, w, n, e = bbox_ll()
     bb = f"{s:.6f},{w:.6f},{n:.6f},{e:.6f}"
@@ -78,14 +79,19 @@ def download(root):
              f'nwr["industrial"]["name"]({b2});nwr["landuse"~"industrial|commercial|retail"]["name"]({b2});'
              f'nwr["shop"~"mall|department_store"]["name"]({b2});'
              f');out center tags;', os.path.join(raw, "companies2.json"))
-    overpass(f'[out:json][timeout:120];nwr["name"~"{PROBE}",i]({b2});out center tags;', os.path.join(raw, "probe.json"))
+    if PLACE == "passau":
+        overpass(f'[out:json][timeout:120];nwr["name"~"{PROBE}",i]({b2});out center tags;', os.path.join(raw, "probe.json"))
+    else:
+        # benannte Fließgewässer im Kern (für die Beschriftung, siehe 08_labels.py)
+        overpass(f'[out:json][timeout:90];way["waterway"~"^(river|stream)$"]["name"]({bb});out geom tags;',
+                 os.path.join(raw, "waterways.json"))
     for f in ("streets.json", "companies2.json"):
         d = json.load(open(os.path.join(raw, f)))
         print(f"  {f}: {len(d['elements'])} Elemente (OSM-Stand {d.get('osm3s', {}).get('timestamp_osm_base', '?')})")
 
 
 def dgm_sampler(root):
-    dgm = np.load(os.path.join(root, "data", "work", "dgm1.npy"))
+    dgm = np.load(data_dir(root, "work", "dgm1.npy"))
 
     def at(e, n):
         c = int(np.clip(e - E_MIN, 0, dgm.shape[1] - 1))
@@ -95,7 +101,7 @@ def dgm_sampler(root):
 
 
 def build_streets(root):
-    raw = json.load(open(os.path.join(root, "data", "raw", "osm", "streets.json")))
+    raw = json.load(open(data_dir(root, "raw", "osm", "streets.json")))
     h_at = dgm_sampler(root)
     core = box(E_MIN, N_MIN, E_MAX, N_MAX)
     by_name = {}
@@ -130,14 +136,14 @@ def build_streets(root):
                 out.append({"name": name, "rank": d["rank"], "e": round(p.x, 1), "n": round(p.y, 1),
                             "h": round(h_at(p.x, p.y) + 1.5, 1), "tx": round(float(t[0]), 4),
                             "tn": round(float(t[1]), 4), "len": round(min(line.length / k, line.length), 1)})
-    with open(os.path.join(root, "viewer", "data", "streets.json"), "w") as fh:
+    with open(viewer_dir(root, "streets.json"), "w") as fh:
         json.dump(out, fh, ensure_ascii=False)
     ranks = np.bincount([o["rank"] for o in out], minlength=5)
     print(f"Straßennamen: {len(by_name)} Namen, {len(out)} Beschriftungspunkte (Rang 0–4: {ranks.tolist()})")
 
 
 def company_candidates(root):
-    raw = json.load(open(os.path.join(root, "data", "raw", "osm", "companies2.json")))
+    raw = json.load(open(data_dir(root, "raw", "osm", "companies2.json")))
     rows = []
     for el in raw["elements"]:
         t = el.get("tags", {})
@@ -163,7 +169,7 @@ def company_candidates(root):
 
 
 # ---- Firmenauswahl -------------------------------------------------------------------------------
-# "Bekannt" ist eine redaktionelle Auswahl (hier anpassen); Name und Lage stammen immer aus OSM.
+# "Bekannt" ist eine redaktionelle Auswahl für Passau (hier anpassen); Name und Lage stammen immer aus OSM.
 #   1. Werke, Fabriken, Brauereien/Brennereien (alle benannten)
 #   2. Einkaufszentren und Kaufhäuser mit Marken-Eintrag
 #   3. Unternehmen/Marken aus den Listen unten (nur wenn OSM sie im Modellbereich führt)
@@ -189,7 +195,7 @@ def _rows(path):
 
 
 def select_companies(root):
-    raw = os.path.join(root, "data", "raw", "osm")
+    raw = data_dir(root, "raw", "osm")
     picked = []
     for t, e, n in _rows(os.path.join(raw, "companies2.json")):
         name, low = t["name"], t["name"].lower()
@@ -230,8 +236,8 @@ def build_companies(root):
     polys = [shapely.union_all([shapely.Polygon(r[0][:, :2]).buffer(0) for r in b["ground_polys"] if len(r[0]) >= 3]) for b in bs]
     tree = shapely.STRtree(polys)
     h_at = dgm_sampler(root)
-    cmeta = json.load(open(os.path.join(root, "viewer", "data", "context.json")))
-    ch = np.fromfile(os.path.join(root, "viewer", "data", "context_heights.bin"), "<u2").reshape(cmeta["rows"], cmeta["cols"])
+    cmeta = json.load(open(viewer_dir(root, "context.json")))
+    ch = np.fromfile(viewer_dir(root, "context_heights.bin"), "<u2").reshape(cmeta["rows"], cmeta["cols"])
     out = []
     for c in sel:
         e, n = c["e"], c["n"]
@@ -250,7 +256,7 @@ def build_companies(root):
                 continue                                     # außerhalb der Datenabdeckung (Österreich)
             h = cmeta["hBase"] + v * cmeta["hScale"] + 22
         out.append({"name": c["name"], "sub": c["sub"], "e": round(e, 1), "n": round(n, 1), "h": round(h, 1)})
-    with open(os.path.join(root, "viewer", "data", "companies.json"), "w") as fh:
+    with open(viewer_dir(root, "companies.json"), "w") as fh:
         json.dump(out, fh, ensure_ascii=False, indent=0)
     print(f"Firmen: {len(out)}")
     for o in out:

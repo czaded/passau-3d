@@ -22,6 +22,7 @@ from shapely.geometry import Polygon
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import (E_MIN, E_MAX, N_MIN, N_MAX, ORIGIN_E, ORIGIN_N, CHUNK)  # noqa: E402
+from config import PLACE, data_dir, viewer_dir  # noqa: E402
 from lod2 import load_buildings  # noqa: E402
 
 NX = int((E_MAX - E_MIN) / CHUNK)
@@ -44,11 +45,11 @@ COL_STONE = (176, 168, 152)
 COL_CONCRETE = (150, 150, 146)
 COL_CHURCH = [(238, 234, 224), (232, 226, 210), (240, 236, 226)]
 
-# Altstadt/Innstadt-Kern: höhere Pastell-Quote, höhere Geschosse
+# Altstadt/Innstadt-Kern (nur Passau): höhere Pastell-Quote, höhere Geschosse
 OLD_TOWN = [Polygon([(828850, 5389560), (829300, 5389480), (829700, 5389640), (830300, 5389840),
                      (830300, 5389990), (829600, 5390010), (828900, 5389900)]),
             Polygon([(829250, 5389180), (829560, 5389330), (830150, 5389560), (830150, 5389400),
-                     (829600, 5389180)])]
+                     (829600, 5389180)])] if PLACE == "passau" else []
 
 
 def h8(s, salt=""):
@@ -155,8 +156,8 @@ def classify(b, area, in_old):
 
 
 def main(root):
-    out_dir = os.path.join(root, "viewer", "data")
-    work = os.path.join(root, "data", "work")
+    out_dir = viewer_dir(root)
+    work = data_dir(root, "work")
     os.makedirs(out_dir, exist_ok=True)
     bs = load_buildings(root, (E_MIN, E_MAX, N_MIN, N_MAX))
     # Brückenbauwerke (53001_*) übernimmt 07_bridges.py (eigene Textur, Wasser darunter)

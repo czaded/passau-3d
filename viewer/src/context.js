@@ -10,7 +10,7 @@ export async function loadContext(ctx) {
   const [buf, tex, wBuf] = await Promise.all([
     fetch(ctx.url('context_heights.bin')).then((r) => r.arrayBuffer()),
     new THREE.TextureLoader().loadAsync(ctx.url('context_ortho.jpg')),
-    fetch(ctx.url('context_water.bin')).then((r) => (r.ok ? r.arrayBuffer() : null)),
+    meta.waterCols ? fetch(ctx.url('context_water.bin')).then((r) => (r.ok ? r.arrayBuffer() : null)) : null,
   ]);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = ctx.renderer.capabilities.getMaxAnisotropy();

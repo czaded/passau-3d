@@ -17,6 +17,7 @@ from scipy import ndimage as ndi
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import (E_MIN_KM, E_MAX_KM, N_MIN_KM, N_MAX_KM, CHUNK, ORTHO_PX)  # noqa: E402
+from config import data_dir, viewer_dir  # noqa: E402
 
 PX_PER_KM = 5000  # DOP20
 SUB = int(1000 / CHUNK)  # Chunks je km
@@ -35,9 +36,9 @@ def water_field(work, inpaint):
 
 
 def main(root, mode):
-    raw = os.path.join(root, "data", "raw", "dop20")
-    out = os.path.join(root, "viewer", "data", "ortho")
-    work = os.path.join(root, "data", "work")
+    raw = data_dir(root, "raw", "dop20")
+    out = viewer_dir(root, "ortho")
+    work = data_dir(root, "work")
     os.makedirs(out, exist_ok=True)
     w_km, h_km = E_MAX_KM - E_MIN_KM, N_MAX_KM - N_MIN_KM
     half = np.zeros((h_km * 2000, w_km * 2000, 3), np.uint8)  # 0,5 m

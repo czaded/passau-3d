@@ -1,9 +1,11 @@
 #!/bin/bash
-# Baut das Passau-3D-Modell vollständig neu (Download ~3,3 GB, Rechenzeit grob 10–15 min).
-# Aufruf: ./build.sh
+# Baut das 3D-Modell vollständig neu.
+# Aufruf: ./build.sh              Passau (Download ~3,3 GB, Rechenzeit grob 10–15 min)
+#         ./build.sh malgersdorf  verstecktes Extra des Viewers (Download ~2,4 GB) -> viewer/places/malgersdorf
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$PWD"
+export PLACE="${1:-passau}"      # Ort, siehe pipeline/config.py
 
 if [ ! -x .venv/bin/python ]; then
   python3 -m venv .venv
@@ -25,13 +27,15 @@ $PY pipeline/03_buildings.py "$ROOT"           # Gebäude (Dächer, Wände, Fass
 $PY pipeline/04_ortho.py "$ROOT" mosaic        # Analyse-Mosaik 0,5 m
 $PY pipeline/05_lidar_rasters.py "$ROOT"       # Laserpunkte -> Raster
 $PY pipeline/06_layers.py "$ROOT"              # Wasser, Kronendach, Einzelbäume
-$PY pipeline/07_bridges.py "$ROOT"             # Brücken
-$PY pipeline/12_boats.py "$ROOT"               # Schiffe: aus der Wasserfläche nehmen, 3D-Körper
+if [ "$PLACE" = passau ]; then
+  $PY pipeline/07_bridges.py "$ROOT"           # Brücken
+  $PY pipeline/12_boats.py "$ROOT"             # Schiffe: aus der Wasserfläche nehmen, 3D-Körper
+fi
 $PY pipeline/04_ortho.py "$ROOT" textures      # Luftbild-Texturen (unter Brücken: Wasser)
+$PY pipeline/11_osm.py "$ROOT" download        # Straßennamen/Firmen/Gewässernamen (OpenStreetMap, öffentliche Overpass-Server)
 $PY pipeline/08_labels.py "$ROOT"              # Beschriftungen
 $PY pipeline/09_context.py "$ROOT" download    # Umgebungsring 3 km (DGM1 + DOP40)
 $PY pipeline/09_context.py "$ROOT" build
-$PY pipeline/11_osm.py "$ROOT" download      # Straßennamen/Firmen (OpenStreetMap, öffentliche Overpass-Server)
 $PY pipeline/11_osm.py "$ROOT" build
 $PY pipeline/10_finalize.py "$ROOT"
-echo "Fertig. Start mit ./start.command"
+echo "Fertig ($PLACE). Start mit ./start.command"

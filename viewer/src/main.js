@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { MapControls } from 'three/addons/controls/MapControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { Atmosphere, sunAngles, GRID_CONVERGENCE } from './atmosphere.js';
+import { Atmosphere, sunAngles, setSunPlace } from './atmosphere.js';
 import { loadTerrain } from './terrain.js';
 import { loadBuildings } from './buildings.js';
 import { loadBridges, loadBoats } from './bridges.js';
@@ -11,10 +11,18 @@ import { loadTrees } from './trees.js';
 import { WaterFx } from './water.js';
 import { Overlay } from './overlay.js';
 import { PostFx } from './post.js';
+import { PLACES, placeId } from './places.js';
 
 const params = new URLSearchParams(location.search);
 const num = (k, d) => (params.has(k) ? parseFloat(params.get(k)) : d);
 const $ = (id) => document.getElementById(id);
+
+// Ort: Passau, oder das versteckte Extra (siehe places.js)
+const PLACE_ID = placeId(params);
+const place = PLACES[PLACE_ID];
+setSunPlace(place);
+document.title = `${place.title} 3D`;
+$('loaderTitle').textContent = place.title;
 
 const canvas = $('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
@@ -33,7 +41,8 @@ const ctx = {
   quality: { vegStep: num('veg', 1), shadowMap: num('shadow', 4096), pixelRatio: Math.min(devicePixelRatio, num('pr', 1.5)),
     maxPixelRatio: Math.min(devicePixelRatio, num('pr', 2)), autoRes: !params.has('pr'),
     lodDist: num('lod', 600), reflScale: num('refl', 0.5) },
-  settings: { shadows: true, ao: num('ao', 1) > 0, labels: num('labels', 1) > 0, trees: true, reflections: num('refl', 0.5) > 0,
+  settings: { shadows: true, ao: num('ao', 1) > 0, labels: num('labels', 1) > 0, trees: true,
+    reflections: place.planarWater && num('refl', 0.5) > 0,
     streets: num('streets', 1) > 0, companies: num('companies', 1) > 0 },
   uniforms: {
     uTime: { value: 0 }, uNight: { value: 0 },
@@ -46,6 +55,7 @@ const ctx = {
   },
   stats: {},
   baseExposure: num('exp', 0.92),
+  place, placeId: PLACE_ID,
 };
 window.passau = ctx;
 
@@ -82,15 +92,7 @@ controls.screenSpacePanning = false;
 let E0 = 829000, N0 = 5389500;
 const U = (e, n, h) => new THREE.Vector3(e - E0, h, N0 - n);
 
-const PRESETS = {
-  overview:  { label: 'Übersicht',        pos: [830900, 5387650, 1750], tgt: [829250, 5389720, 300] },
-  confluence:{ label: 'Dreiflüsseeck',    pos: [830870, 5389660, 470],  tgt: [829900, 5389820, 300] },
-  dom:       { label: 'Dom St. Stephan',  pos: [829640, 5389470, 455],  tgt: [829345, 5389755, 325] },
-  oberhaus:  { label: 'Veste Oberhaus',   pos: [830060, 5389770, 500],  tgt: [829715, 5390160, 395] },
-  postcard:  { label: 'Blick von der Veste', pos: [829770, 5390205, 432], tgt: [829420, 5389790, 315] },
-  innstadt:  { label: 'Innstadt · Mariahilf', pos: [829330, 5389760, 420], tgt: [829900, 5389390, 320] },
-  rathaus:   { label: 'Rathaus · Donaulände', pos: [829700, 5390190, 360], tgt: [829580, 5389870, 305] },
-};
+const PRESETS = place.presets;
 
 let fly = null;
 function goTo(key, instant = false) {
@@ -143,20 +145,20 @@ async function loadLabels() {
 async function init() {
   resize();
   // Build-Stempel der Pipeline an alle Daten-URLs hängen (verhindert veraltete Cache-Stände)
-  const build = await fetch('data/build.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
-  ctx.url = (p) => `data/${p}?v=${build.stamp || 0}`;
+  const build = await fetch(`${place.data}/build.json`, { cache: 'no-store' }).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+  ctx.url = (p) => `${place.data}/${p}?v=${build.stamp || 0}`;
   await loadTerrain(ctx, progress);
   E0 = ctx.meta.originE; N0 = ctx.meta.originN;
   await loadBuildings(ctx, progress);
-  await loadBridges(ctx).catch((e) => console.warn('Brücken nicht geladen', e));
-  await loadBoats(ctx).catch((e) => console.warn('Schiffe nicht geladen', e));
+  if (place.parts.includes('bridges')) await loadBridges(ctx).catch((e) => console.warn('Brücken nicht geladen', e));
+  if (place.parts.includes('boats')) await loadBoats(ctx).catch((e) => console.warn('Schiffe nicht geladen', e));
   await loadTrees(ctx).catch((e) => console.warn('Einzelbäume nicht geladen', e));
   await loadContext(ctx).catch((e) => console.warn('Umgebung nicht geladen', e));
   await loadLabels();
   await ctx.overlay.load();
-  setClock(num('t', 11.25));
+  setClock(num('t', place.clock));
   buildUi();
-  goTo(params.get('view') || 'confluence', true);
+  goTo(Object.hasOwn(PRESETS, params.get('view')) ? params.get('view') : place.start, true);
   if (params.has('cam')) {
     const v = params.get('cam').split(',').map(Number);
     camera.position.copy(U(v[0], v[1], v[2])); controls.target.copy(U(v[3], v[4], v[5])); controls.update();
@@ -171,6 +173,12 @@ async function init() {
 
 function buildUi() {
   if (num('ui', 1) === 0) document.body.classList.add('noui');
+  $('title').textContent = place.title;
+  $('sub').textContent = place.sub;
+  $('flight').textContent = place.flight;
+  $('osmWhat').textContent = place.osm;
+  $('time').setAttribute('aria-label', `Tageszeit (${place.day})`);
+  $('title').addEventListener('click', secretClick);
   const pr = $('presets');
   for (const [k, p] of Object.entries(PRESETS)) {
     const b = document.createElement('button');
@@ -192,20 +200,43 @@ function buildUi() {
   toggle('tRefl', 'reflections', () => {});
   toggle('tStreets', 'streets', () => {});
   toggle('tCompanies', 'companies', () => {});
+  // Schalter ohne Wirkung am gewählten Ort ausblenden
+  const hide = (id) => { $(id).parentElement.style.display = 'none'; };
+  if (!place.planarWater) hide('tRefl');
+  if (!ctx.stats.streetLabels) hide('tStreets');
+  if (!ctx.stats.companies) hide('tCompanies');
   $('compass').onclick = rotateToNorth;
   toggle('tTrees', 'trees', (v) => { ctx.canopyGroup.visible = v; if (ctx.treeGroup) ctx.treeGroup.visible = v; ctx.sceneStamp++; });
   $('labels').style.display = ctx.settings.labels ? '' : 'none';
 }
 
-// ---------- Kompass (geografisch Nord; Gitternord des UTM-Systems weicht hier um 3,34° ab)
+// ---------- Verstecktes Extra: dreimal schnell auf den Ortsnamen klicken wechselt den Ort (Passau <-> Malgersdorf)
+let secretClicks = 0, secretTimer = 0;
+function secretClick() {
+  clearTimeout(secretTimer);
+  if (++secretClicks < 3) { secretTimer = setTimeout(() => { secretClicks = 0; }, 600); return; }
+  secretClicks = 0;
+  const q = new URLSearchParams(location.search);
+  q.delete('view'); q.delete('cam'); q.delete('t');        // ortsbezogene Angaben nicht mitnehmen
+  if (place.other === 'passau') q.delete('ort'); else q.set('ort', place.other);
+  const query = q.toString();
+  // Ladebild mit dem neuen Ortsnamen einblenden, dann wechseln
+  $('loaderTitle').textContent = PLACES[place.other].title;
+  $('bar').style.width = '0';
+  $('stage').textContent = '';
+  $('loader').classList.remove('done');
+  setTimeout(() => { location.href = location.pathname + (query ? `?${query}` : ''); }, 450);
+}
+
+// ---------- Kompass (geografisch Nord; Gitternord des UTM-Systems weicht je nach Ort um rund 3° ab, siehe places.js)
 let spin = null, lastHeading = 1e9;
 function heading() {
   const dx = controls.target.x - camera.position.x, dz = controls.target.z - camera.position.z;
-  return (THREE.MathUtils.radToDeg(Math.atan2(dx, -dz)) + GRID_CONVERGENCE + 360) % 360;
+  return (THREE.MathUtils.radToDeg(Math.atan2(dx, -dz)) + place.convergence + 360) % 360;
 }
 function rotateToNorth() {
   const off = camera.position.clone().sub(controls.target);
-  const a0 = Math.atan2(off.x, off.z), a1 = THREE.MathUtils.degToRad(GRID_CONVERGENCE);
+  const a0 = Math.atan2(off.x, off.z), a1 = THREE.MathUtils.degToRad(place.convergence);
   const da = ((a1 - a0 + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
   fly = null;
   spin = { t: 0, a0, da, r: Math.hypot(off.x, off.z), y: off.y };

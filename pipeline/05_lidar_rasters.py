@@ -20,6 +20,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import (E_MIN, N_MAX, E_MIN_KM, E_MAX_KM, N_MIN_KM, N_MAX_KM)  # noqa: E402
+from config import data_dir  # noqa: E402
 
 RES = 0.5
 T = int(1000 / RES)  # Zellen je Kachel
@@ -35,7 +36,7 @@ def reduce_cells(cell, z, func, fill):
 
 
 def main(root):
-    raw = os.path.join(root, "data", "raw", "laser")
+    raw = data_dir(root, "raw", "laser")
     w, h = (E_MAX_KM - E_MIN_KM) * T, (N_MAX_KM - N_MIN_KM) * T
     c20_max = np.full((h, w), np.nan, np.float32)
     c20_min = np.full((h, w), np.nan, np.float32)
@@ -64,7 +65,7 @@ def main(root):
             print(f"  {e}_{n}: {len(z) / 1e6:.1f} Mio Punkte, Klassen {dict(zip(u.tolist(), c.tolist()))}",
                   flush=True)
             del las, x, y, z, cls
-    np.savez(os.path.join(root, "data", "work", "lidar_05.npz"),
+    np.savez(data_dir(root, "work", "lidar_05.npz"),
              c20_max=c20_max, c20_min=c20_min, c20_cnt=c20_cnt, c23_cnt=c23_cnt)
     print("fertig")
 

@@ -32,6 +32,7 @@ from shapely.geometry.polygon import orient
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import (E_MIN, N_MAX, ORIGIN_E, ORIGIN_N)  # noqa: E402
+from config import data_dir, viewer_dir  # noqa: E402
 
 _spec = importlib.util.spec_from_file_location("bridges07", os.path.join(os.path.dirname(os.path.abspath(__file__)), "07_bridges.py"))
 bridges07 = importlib.util.module_from_spec(_spec)
@@ -150,8 +151,8 @@ def wall_tris(ring, z0, z1):
 
 
 def main(root):
-    work = os.path.join(root, "data", "work")
-    out = os.path.join(root, "viewer", "data")
+    work = data_dir(root, "work")
+    out = viewer_dir(root)
     tex_dir = os.path.join(out, "boats")
     os.makedirs(tex_dir, exist_ok=True)
     for f in os.listdir(tex_dir):

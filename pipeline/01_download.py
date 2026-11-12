@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Lädt die amtlichen OpenData-Kacheln (Bayerische Vermessungsverwaltung, CC BY 4.0)
-für den Passau-Ausschnitt: LoD2 (CityGML), DGM1, DOP20, Laserpunkte.
+für den Modellausschnitt (Ort: Umgebungsvariable PLACE): LoD2 (CityGML), DGM1, DOP20, Laserpunkte.
 
 Aufruf: python -I pipeline/01_download.py <projekt-root>
 """
@@ -13,10 +13,9 @@ from concurrent.futures import ThreadPoolExecutor
 from lxml import etree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import E_MIN_KM, E_MAX_KM, N_MIN_KM, N_MAX_KM  # noqa: E402
+from config import AGS, E_MIN_KM, E_MAX_KM, N_MIN_KM, N_MAX_KM, data_dir  # noqa: E402
 
 UA = "Mozilla/5.0 (generic-client)"
-AGS = "09262000"  # Stadt Passau
 META = {
     "lod2": f"https://geodaten.bayern.de/odd/a/lod2/citygml/meta/metalink/{AGS}.meta4",
     "dgm1": f"https://geodaten.bayern.de/odd/a/dgm/dgm1/meta/metalink/{AGS}.meta4",
@@ -46,8 +45,8 @@ def main(root):
     products = sys.argv[2:] or list(META)
     jobs = []
     for product in products:
-        meta_dir = os.path.join(root, "data", "meta")
-        raw_dir = os.path.join(root, "data", "raw", product)
+        meta_dir = data_dir(root, "meta")
+        raw_dir = data_dir(root, "raw", product)
         os.makedirs(meta_dir, exist_ok=True)
         os.makedirs(raw_dir, exist_ok=True)
         meta_file = os.path.join(meta_dir, f"{product}.meta4")

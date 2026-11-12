@@ -130,9 +130,9 @@ export async function loadTerrain(ctx, progress) {
   ]);
   const [hBuf, wBuf, cBuf, fBuf] = await Promise.all([
     fetch(ctx.url('terrain_heights.bin')).then((r) => r.arrayBuffer()),
-    fetch(ctx.url('water_mask.bin')).then((r) => r.arrayBuffer()),
+    layers.noWater ? null : fetch(ctx.url('water_mask.bin')).then((r) => r.arrayBuffer()),
     fetch(ctx.url('canopy.bin')).then((r) => r.arrayBuffer()),
-    fetch(ctx.url('water_flow.bin')).then((r) => (r.ok ? r.arrayBuffer() : null)),
+    layers.flowCols ? fetch(ctx.url('water_flow.bin')).then((r) => (r.ok ? r.arrayBuffer() : null)) : null,
   ]);
   progress(0.1, 'Gelände');
   const H = new Uint16Array(hBuf);
@@ -152,8 +152,8 @@ export async function loadTerrain(ctx, progress) {
   };
   Object.assign(ctx, { meta, layers, sampleHeight, minX, minZ, width, depth, nx, nz });
 
-  // Wassermaske als Textur
-  const wTex = new THREE.DataTexture(new Uint8Array(wBuf), layers.cols, layers.rows, THREE.RedFormat);
+  // Wassermaske als Textur (Ort ohne Wasserflächen: 1 Pixel "Land")
+  const wTex = new THREE.DataTexture(wBuf ? new Uint8Array(wBuf) : new Uint8Array([0]), wBuf ? layers.cols : 1, wBuf ? layers.rows : 1, THREE.RedFormat);
   wTex.magFilter = wTex.minFilter = THREE.LinearFilter;
   wTex.needsUpdate = true;
   ctx.uniforms.uWaterMask.value = wTex;

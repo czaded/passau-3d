@@ -16,6 +16,7 @@ from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import (E_MIN, E_MAX, N_MIN, N_MAX, ORIGIN_E, ORIGIN_N, CHUNK,  # noqa: E402
                     TERRAIN_STEP)
+from config import data_dir, viewer_dir  # noqa: E402
 
 H_BASE = 250.0   # uint16-Kodierung: h = H_BASE + v * H_SCALE
 H_SCALE = 0.01
@@ -70,9 +71,9 @@ def hillshade(z, cell, az=315.0, alt=45.0):
 
 
 def main(root):
-    raw = os.path.join(root, "data", "raw", "dgm1")
-    work = os.path.join(root, "data", "work")
-    out = os.path.join(root, "viewer", "data")
+    raw = data_dir(root, "raw", "dgm1")
+    work = data_dir(root, "work")
+    out = viewer_dir(root)
     os.makedirs(work, exist_ok=True)
     os.makedirs(out, exist_ok=True)
 

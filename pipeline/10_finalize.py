@@ -8,16 +8,19 @@ import os
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config import viewer_dir  # noqa: E402
+
 
 def main(root):
-    out = os.path.join(root, "viewer", "data")
+    out = viewer_dir(root)
     total = 0
     for base, _, files in os.walk(out):
         for f in files:
             total += os.path.getsize(os.path.join(base, f))
     with open(os.path.join(out, "build.json"), "w") as fh:
         json.dump({"stamp": int(time.time()), "bytes": total}, fh)
-    print(f"viewer/data: {total / 1e6:.0f} MB, Build-Stempel gesetzt")
+    print(f"{os.path.relpath(out, root)}: {total / 1e6:.0f} MB, Build-Stempel gesetzt")
 
 
 if __name__ == "__main__":

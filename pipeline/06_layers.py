@@ -19,6 +19,7 @@ from scipy import ndimage as ndi
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import (E_MIN, E_MAX, N_MIN, N_MAX)  # noqa: E402
+from config import PLACE, SETTINGS, data_dir, viewer_dir  # noqa: E402
 
 CANOPY_STEP = 0.25
 
@@ -28,9 +29,50 @@ def block_reduce(a, f, func):
     return func(a.reshape(h // f, f, w // f, f), axis=(1, 3))
 
 
+def flow_field(out, water, wc, solve, nsol, ri, ci, vi, rhs, sp, spsolve, FLOW_CELL):
+    """Potentialströmung lösen und water_flow.bin schreiben (RG Strömung, B Uferabstand)."""
+    fh, fw = wc.shape
+    lap = sp.csr_matrix((np.concatenate(vi), (np.concatenate(ri), np.concatenate(ci))), shape=(nsol, nsol))
+    phi = np.full(wc.shape, np.nan)
+    phi[solve] = spsolve(lap.tocsc(), rhs)
+    _, (ir, ic) = ndi.distance_transform_edt(np.isnan(phi), return_indices=True)
+    gy, gx = np.gradient(phi[ir, ic], FLOW_CELL)                       # gy: Richtung Süd (+z), gx: Ost (+x)
+    wgt = ndi.gaussian_filter(solve.astype(np.float64), 1.5) + 1e-9     # normierte Glättung nur im Wasser
+    gx = ndi.gaussian_filter(np.where(solve, gx, 0.0), 1.5) / wgt
+    gy = ndi.gaussian_filter(np.where(solve, gy, 0.0), 1.5) / wgt
+    mag = np.hypot(gx, gy)
+    ref = np.percentile(mag[solve], 75)
+    spd = np.clip(mag / ref, 0.0, 2.0) / 2.0                           # 1,0 = doppelte Referenzgeschwindigkeit
+    flow = np.stack([gx / (mag + 1e-12) * spd, gy / (mag + 1e-12) * spd], -1)
+    flow[~solve] = 0.0
+    _, (jr, jc) = ndi.distance_transform_edt(~solve, return_indices=True)
+    near = ndi.distance_transform_edt(~solve) < 4                       # nur knapp über das Ufer hinaus fortsetzen
+    flow = np.where(near[..., None], flow[jr, jc], 0.0)
+    # RGBA: R/G Strömung, B Uferabstand (0..63,75 m; für Flachwasser-Übergang), A frei
+    bank = block_reduce(np.minimum(ndi.distance_transform_edt(water), 63.75), FLOW_CELL, np.mean)
+    rgba = np.full((fh, fw, 4), 255, np.uint8)
+    rgba[..., :2] = np.clip(np.round((flow * 0.5 + 0.5) * 255), 0, 255)
+    rgba[..., 2] = np.round(bank * 4)
+    rgba.tofile(os.path.join(out, "water_flow.bin"))
+
+    def probe(name, e, n):
+        r, c = int((N_MAX - n) / FLOW_CELL), int((e - E_MIN) / FLOW_CELL)
+        vx, vz = flow[r, c]
+        az = (np.degrees(np.arctan2(vx, -vz)) + 360) % 360
+        print(f"  Strömung {name}: Richtung {az:.0f}° (Gitter, 0 = Nord), rel. Geschwindigkeit {2 * np.hypot(vx, vz):.2f}")
+
+    print(f"Strömungsfeld: {nsol} Zellen gelöst")
+    if PLACE == "passau":
+        probe("Donau (oberhalb)", 828892, 5390026)
+        probe("Inn", 829450, 5389586)
+        probe("Ilz", 829874, 5390710)
+        probe("Donau (unterhalb Dreiflüsseeck)", 830600, 5389800)
+    return {"flowCols": int(fw), "flowRows": int(fh), "flowCell": FLOW_CELL}
+
+
 def main(root):
-    work = os.path.join(root, "data", "work")
-    out = os.path.join(root, "viewer", "data")
+    work = data_dir(root, "work")
+    out = viewer_dir(root)
     dgm = np.load(os.path.join(work, "dgm1.npy"))                      # 1 m, (3000, 4000)
     lid = np.load(os.path.join(work, "lidar_05.npz"))
     ortho = np.load(os.path.join(work, "ortho_05.npy"))                # 0,5 m RGB
@@ -41,7 +83,7 @@ def main(root):
     # Kandidaten: Zellen nahe am lokalen Minimum (40 m Umkreis) mit sehr geringer Neigung –
     # so sieht das hydrologisch eingeebnete DGM über Wasser aus. Behalten werden Komponenten
     # mit Laser-Wasserpunkten (Klasse 23) oder auf Flussniveau (< RIVER_MAX m, Ilz ohne Saat).
-    RIVER_MAX = 294.0
+    RIVER_MAX = SETTINGS["river_max"]                                   # None: keine Flussniveau-Regel
     nodata = np.load(os.path.join(work, "dgm1_nodata.npy"))
     seed = block_reduce(lid["c23_cnt"].astype(np.uint32), 2, np.sum) >= 2
     lo = ndi.minimum_filter(dgm, 81)
@@ -53,7 +95,9 @@ def main(root):
     area = np.bincount(lab.ravel(), minlength=n + 1)[1:]
     zmed = ndi.median(dgm, lab, index=idx)
     keep = np.zeros(n + 1, bool)
-    keep[1:] = ((seeds >= 60) & (area >= 2000)) | ((zmed < RIVER_MAX) & (area >= 500))
+    keep[1:] = (seeds >= 60) & (area >= 2000)
+    if RIVER_MAX is not None:
+        keep[1:] |= (zmed < RIVER_MAX) & (area >= 500)
     water = keep[lab]
     # Schließen mit Randfortsetzung (sonst frisst die Erosion 3 m am Ausschnittsrand weg)
     pad = 24
@@ -67,7 +111,9 @@ def main(root):
     water |= wide & (dgm <= near_level + 0.6)
     water = ndi.binary_fill_holes(water)
     water &= ~block_reduce(bmask, 2, np.any) & ~nodata
-    print(f"Wasser: {water.sum() / 1e6:.3f} km², Pegel {np.percentile(dgm[water], [1, 50, 99]).round(2)}")
+    has_water = bool(water.any())
+    print(f"Wasser: {water.sum() / 1e6:.3f} km², Pegel "
+          f"{np.percentile(dgm[water], [1, 50, 99]).round(2) if has_water else '–'}")
 
     # ---------------- Strömungsfeld (für die Wasser-Animation)
     # Potentialströmung auf der Wassermaske (4-m-Zellen): Zufluss am West-, Süd- und Nordrand
@@ -121,41 +167,12 @@ def main(root):
     ri.append(np.arange(nsol))
     ci.append(np.arange(nsol))
     vi.append(diag)
-    lap = sp.csr_matrix((np.concatenate(vi), (np.concatenate(ri), np.concatenate(ci))), shape=(nsol, nsol))
-    phi = np.full(wc.shape, np.nan)
-    phi[solve] = spsolve(lap.tocsc(), rhs)
-    _, (ir, ic) = ndi.distance_transform_edt(np.isnan(phi), return_indices=True)
-    gy, gx = np.gradient(phi[ir, ic], FLOW_CELL)                       # gy: Richtung Süd (+z), gx: Ost (+x)
-    wgt = ndi.gaussian_filter(solve.astype(np.float64), 1.5) + 1e-9     # normierte Glättung nur im Wasser
-    gx = ndi.gaussian_filter(np.where(solve, gx, 0.0), 1.5) / wgt
-    gy = ndi.gaussian_filter(np.where(solve, gy, 0.0), 1.5) / wgt
-    mag = np.hypot(gx, gy)
-    ref = np.percentile(mag[solve], 75)
-    spd = np.clip(mag / ref, 0.0, 2.0) / 2.0                           # 1,0 = doppelte Referenzgeschwindigkeit
-    flow = np.stack([gx / (mag + 1e-12) * spd, gy / (mag + 1e-12) * spd], -1)
-    flow[~solve] = 0.0
-    _, (jr, jc) = ndi.distance_transform_edt(~solve, return_indices=True)
-    near = ndi.distance_transform_edt(~solve) < 4                       # nur knapp über das Ufer hinaus fortsetzen
-    flow = np.where(near[..., None], flow[jr, jc], 0.0)
-    # RGBA: R/G Strömung, B Uferabstand (0..63,75 m; für Flachwasser-Übergang), A frei
-    bank = block_reduce(np.minimum(ndi.distance_transform_edt(water), 63.75), FLOW_CELL, np.mean)
-    rgba = np.full((fh, fw, 4), 255, np.uint8)
-    rgba[..., :2] = np.clip(np.round((flow * 0.5 + 0.5) * 255), 0, 255)
-    rgba[..., 2] = np.round(bank * 4)
-    rgba.tofile(os.path.join(out, "water_flow.bin"))
-    flow_meta = {"flowCols": int(fw), "flowRows": int(fh), "flowCell": FLOW_CELL}
-
-    def probe(name, e, n):
-        r, c = int((N_MAX - n) / FLOW_CELL), int((e - E_MIN) / FLOW_CELL)
-        vx, vz = flow[r, c]
-        az = (np.degrees(np.arctan2(vx, -vz)) + 360) % 360
-        print(f"  Strömung {name}: Richtung {az:.0f}° (Gitter, 0 = Nord), rel. Geschwindigkeit {2 * np.hypot(vx, vz):.2f}")
-
-    print(f"Strömungsfeld: {nsol} Zellen gelöst")
-    probe("Donau (oberhalb)", 828892, 5390026)
-    probe("Inn", 829450, 5389586)
-    probe("Ilz", 829874, 5390710)
-    probe("Donau (unterhalb Dreiflüsseeck)", 830600, 5389800)
+    flow_meta = {}
+    if nsol:
+        flow_meta = flow_field(out, water, wc, solve, nsol, ri, ci, vi, rhs, sp, spsolve, FLOW_CELL)
+    else:
+        # kein durchströmtes Gewässer im Ausschnitt (Weiher, schmale Bäche): der Viewer zeigt stehendes Wasser
+        print("Strömungsfeld: keines (kein Gewässer mit Zu- und Abfluss am Ausschnittsrand)")
 
     # ---------------- Vegetation (0,5 m -> 1 m)
     dgm05 = np.repeat(np.repeat(dgm, 2, 0), 2, 1)
@@ -259,11 +276,19 @@ def main(root):
 
     q.tofile(os.path.join(out, "canopy.bin"))
     # Uferlinie weichzeichnen: der Viewer schwellt bei 50 % -> glatte statt treppenförmige Kante
-    soft = ndi.gaussian_filter(water.astype(np.float32), 1.3)
-    np.clip(np.round(soft * 255), 0, 255).astype(np.uint8).tofile(os.path.join(out, "water_mask.bin"))
+    mask_path = os.path.join(out, "water_mask.bin")
+    if has_water:
+        soft = ndi.gaussian_filter(water.astype(np.float32), 1.3)
+        np.clip(np.round(soft * 255), 0, 255).astype(np.uint8).tofile(mask_path)
+        water_meta = {"waterLevel": float(np.median(dgm[water]))}
+    else:
+        # keine Wasserfläche erkannt: keine Maske schreiben (der Viewer nimmt dann "überall Land")
+        if os.path.exists(mask_path):
+            os.remove(mask_path)
+        water_meta = {"waterLevel": float(dgm.min()), "noWater": True}
     with open(os.path.join(out, "layers.json"), "w") as fh:
         json.dump({"cols": w, "rows": h, "cell": 1.0, "canopyStep": CANOPY_STEP, "treeStride": 9,
-                   "waterLevel": float(np.median(dgm[water])), **flow_meta}, fh)
+                   **water_meta, **flow_meta}, fh)
     np.save(os.path.join(work, "water_1m.npy"), water)
     np.save(os.path.join(work, "canopy_1m.npy"), canopy)
 

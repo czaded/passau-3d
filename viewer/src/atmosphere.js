@@ -1,18 +1,23 @@
-// Himmel (Preetham-Modell + Wolken), Sonnenstand für Passau, Schatten, Umgebungslicht, Dunst.
+// Himmel (Preetham-Modell + Wolken), Sonnenstand am gewählten Ort, Schatten, Umgebungslicht, Dunst.
 import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 
 const DEG = Math.PI / 180;
-const LAT = 48.574 * DEG;
-const DECL = 23.24 * DEG;          // Sonnendeklination am 29. Juni (Bildflugdatum des Luftbilds)
-const SOLAR_OFFSET = -1.16;        // MESZ -> wahre Sonnenzeit bei 13,46° O (inkl. Zeitgleichung)
-export const GRID_CONVERGENCE = 3.34;     // Meridiankonvergenz UTM32 bei Passau: Gitternord liegt 3,34° östlich von geogr. Nord
+// Sonnenstand des Ortes (Werte und Erläuterung: places.js). Vorgabe: Passau am 29. Juni.
+const SUN = { lat: 48.574 * DEG, decl: 23.24 * DEG, solarOffset: -1.16, convergence: 3.34 };
+export function setSunPlace(place) {
+  SUN.lat = place.lat * DEG;
+  SUN.decl = place.decl * DEG;
+  SUN.solarOffset = place.solarOffset;
+  SUN.convergence = place.convergence;
+}
 const SKY_GAIN = 0.065;
 
 export function sunAngles(clock) {
-  const H = (clock + SOLAR_OFFSET - 12) * 15 * DEG;
-  const el = Math.asin(Math.sin(LAT) * Math.sin(DECL) + Math.cos(LAT) * Math.cos(DECL) * Math.cos(H));
-  const az = Math.atan2(-Math.sin(H), Math.tan(DECL) * Math.cos(LAT) - Math.sin(LAT) * Math.cos(H));
+  const { lat, decl } = SUN;
+  const H = (clock + SUN.solarOffset - 12) * 15 * DEG;
+  const el = Math.asin(Math.sin(lat) * Math.sin(decl) + Math.cos(lat) * Math.cos(decl) * Math.cos(H));
+  const az = Math.atan2(-Math.sin(H), Math.tan(decl) * Math.cos(lat) - Math.sin(lat) * Math.cos(H));
   return { az: ((az / DEG) + 360) % 360, el: el / DEG };
 }
 
@@ -87,7 +92,7 @@ export class Atmosphere {
   // az: geografisches Azimut (0 = Nord, 90 = Ost), el: Höhe über Horizont, jeweils Grad
   setSun(az, el) {
     this.az = az; this.el = el;
-    const a = (az - GRID_CONVERGENCE) * DEG, e = el * DEG;
+    const a = (az - SUN.convergence) * DEG, e = el * DEG;
     this.sunDir.set(Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e));
     this.ctx.uniforms.uSunDir.value.copy(this.sunDir);
     for (const s of [this.sky, this.envSky]) s.material.uniforms.sunPosition.value.copy(this.sunDir);

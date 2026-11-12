@@ -27,6 +27,7 @@ from shapely.geometry import Polygon, box
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from config import (E_MIN, E_MAX, N_MIN, N_MAX, ORIGIN_E, ORIGIN_N)  # noqa: E402
+from config import data_dir, viewer_dir  # noqa: E402
 from lod2 import load_buildings  # noqa: E402
 
 RES = 0.5
@@ -53,7 +54,7 @@ def ortho_crop(root, e0, n0, e1, n1):
     out = np.zeros((h, w, 3), np.uint8)
     for te in range(int(e0 // 1000), int((e1 - 1e-6) // 1000) + 1):
         for tn in range(int(n0 // 1000), int((n1 - 1e-6) // 1000) + 1):
-            path = os.path.join(root, "data", "raw", "dop20", f"32{te}_{tn}.tif")
+            path = data_dir(root, "raw", "dop20", f"32{te}_{tn}.tif")
             if not os.path.exists(path):
                 continue
             a = tifffile.imread(path)[..., :3]
@@ -106,8 +107,8 @@ def tri_3d(rings, normal):
 
 
 def main(root):
-    work = os.path.join(root, "data", "work")
-    out = os.path.join(root, "viewer", "data")
+    work = data_dir(root, "work")
+    out = viewer_dir(root)
     tex_dir = os.path.join(out, "bridges")
     os.makedirs(tex_dir, exist_ok=True)
 
