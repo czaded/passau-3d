@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Passau 3D</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --ink: #f3f1ea; --dim: rgba(243,241,234,.62); --glass: rgba(16,20,24,.58); --line: rgba(255,255,255,.14); --accent: #e9b872; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0c1014; color: var(--ink);
+    font: 13px/1.45 -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  #c { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+  #labels { position: fixed; inset: 0; pointer-events: none; }
+  .label { position: absolute; }
+  .label span { display: inline-block; transform: translateY(-14px); padding: 2px 8px 3px; border-radius: 999px;
+    background: rgba(12,16,20,.62); border: 1px solid var(--line); font-size: 11.5px; letter-spacing: .01em; white-space: nowrap;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+  .label::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 1px; height: 14px; background: rgba(255,255,255,.55); }
+  .label.river span { background: none; border: 0; backdrop-filter: none; -webkit-backdrop-filter: none; font: italic 600 15px/1 Georgia, serif;
+    letter-spacing: .32em; text-transform: uppercase; color: rgba(255,255,255,.82); text-shadow: 0 1px 6px rgba(0,30,50,.75); transform: none; }
+  .label.river::after { display: none; }
+  .panel { position: fixed; background: var(--glass); border: 1px solid var(--line); border-radius: 14px;
+    backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }
+  #hud { top: 16px; left: 16px; width: 286px; padding: 14px 16px 12px; }
+  #hud h1 { margin: 0; font: 600 19px/1.1 Georgia, "Times New Roman", serif; letter-spacing: .01em; }
+  #hud .sub { color: var(--dim); font-size: 11.5px; margin: 3px 0 12px; }
+  .row { display: flex; align-items: baseline; justify-content: space-between; }
+  #clock { font-variant-numeric: tabular-nums; font-weight: 600; }
+  #sunel { color: var(--dim); font-size: 11.5px; }
+  input[type=range] { width: 100%; margin: 8px 0 10px; accent-color: var(--accent); }
+  .toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .toggles label { display: flex; align-items: center; gap: 6px; color: var(--dim); cursor: pointer; }
+  .toggles input { accent-color: var(--accent); margin: 0; }
+  .meta { display: flex; justify-content: space-between; margin-top: 9px; color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+  #presets { bottom: 50px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 5px; border-radius: 999px; max-width: calc(100vw - 32px); overflow-x: auto; }
+  #presets button { all: unset; cursor: pointer; padding: 6px 13px; border-radius: 999px; white-space: nowrap; color: var(--dim); }
+  #presets button:hover { background: rgba(255,255,255,.12); color: var(--ink); }
+  #credit { right: 12px; bottom: 10px; position: fixed; font-size: 10.5px; color: rgba(255,255,255,.72); text-shadow: 0 1px 3px rgba(0,0,0,.7); text-align: right; }
+  #credit a { color: inherit; }
+  #hint { right: 16px; top: 16px; position: fixed; font-size: 11px; color: rgba(255,255,255,.7); text-shadow: 0 1px 3px rgba(0,0,0,.7); text-align: right; }
+  #overlay { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .st, .co { position: absolute; left: 0; top: 0; white-space: nowrap; will-change: transform; }
+  .st { font: 600 11px/1 -apple-system, "Segoe UI", system-ui, sans-serif; letter-spacing: .035em; color: #fff;
+    text-shadow: 0 0 2px rgba(0,0,0,.95), 0 0 4px rgba(0,0,0,.8), 0 1px 5px rgba(0,0,0,.7); }
+  .st.r0, .st.r1 { font-size: 12.5px; color: #fff3d6; }
+  .st.r2 { font-size: 11.5px; }
+  .st.r4 { font-size: 10px; font-weight: 500; color: rgba(255,255,255,.88); }
+  .co { display: flex; align-items: center; gap: 5px; padding: 2px 8px 3px 6px; border-radius: 5px; margin-top: -8px;
+    background: rgba(233,184,114,.92); color: #1b1408; font: 600 11.5px/1.3 -apple-system, "Segoe UI", system-ui, sans-serif;
+    box-shadow: 0 1px 6px rgba(0,0,0,.45); }
+  .co i { width: 8px; height: 9px; background: #1b1408; display: inline-block;
+    clip-path: polygon(0 100%, 0 35%, 50% 35%, 50% 0, 100% 0, 100% 100%); }
+  .co::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 8px; background: rgba(233,184,114,.95); }
+  #compass { all: unset; position: fixed; right: 16px; top: 42px; width: 62px; height: 62px; border-radius: 50%; cursor: pointer;
+    background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  #compass:hover { border-color: rgba(255,255,255,.45); }
+  #compass svg { width: 100%; height: 100%; display: block; }
+  #compassText { position: fixed; right: 16px; top: 108px; width: 62px; text-align: center; font-size: 10.5px;
+    color: rgba(255,255,255,.8); text-shadow: 0 1px 3px rgba(0,0,0,.7); font-variant-numeric: tabular-nums; }
+  body.noui #compass, body.noui #compassText { display: none !important; }
+  #loader { position: fixed; inset: 0; display: grid; place-items: center; background: #0c1014; transition: opacity .8s ease; z-index: 10; }
+  #loader.done { opacity: 0; pointer-events: none; }
+  #loader .box { width: 280px; text-align: center; }
+  #loader h2 { font: 600 30px/1 Georgia, serif; margin: 0 0 6px; }
+  #loader p { color: var(--dim); margin: 0 0 18px; }
+  #track { height: 2px; background: rgba(255,255,255,.14); border-radius: 2px; overflow: hidden; }
+  #bar { height: 100%; width: 0; background: var(--accent); transition: width .25s ease; }
+  #stage { margin-top: 10px; color: var(--dim); font-size: 11.5px; }
+  body.noui .panel, body.noui #credit, body.noui #hint { display: none !important; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/build/three.module.js", "three/addons/": "./vendor/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<canvas id="c" tabindex="0"></canvas>
+<div id="labels"></div>
+<div id="overlay"></div>
+
+<div id="hud" class="panel">
+  <h1>Passau</h1>
+  <div class="sub">Dreiflüssestadt · 3D-Modell aus amtlichen Geodaten</div>
+  <div class="row"><span id="clock">–</span><span id="sunel"></span></div>
+  <input id="time" type="range" min="4.5" max="22" step="0.05" aria-label="Tageszeit (29. Juni)">
+  <div class="toggles">
+    <label><input id="tShadow" type="checkbox"> Schatten</label>
+    <label><input id="tTrees" type="checkbox"> Vegetation</label>
+    <label><input id="tAo" type="checkbox"> Umgebungsverd.</label>
+    <label><input id="tLabels" type="checkbox"> Beschriftung</label>
+    <label><input id="tRefl" type="checkbox"> Spiegelung</label>
+    <label><input id="tStreets" type="checkbox"> Straßennamen</label>
+    <label><input id="tCompanies" type="checkbox"> Firmen</label>
+  </div>
+  <div class="meta"><span id="stats"></span><span id="res" title="Renderauflösung (regelt sich nach der Bildrate)"></span><span id="fps"></span></div>
+</div>
+
+<div id="presets" class="panel"></div>
+<button id="compass" title="Nach Norden ausrichten" aria-label="Kompass – Klick richtet die Ansicht nach Norden aus">
+  <svg viewBox="-50 -50 100 100"><g id="compassDial">
+    <g stroke="rgba(255,255,255,.5)" stroke-width="1.6">
+      <line y1="-46" y2="-41"/><line x1="46" x2="41"/><line y1="46" y2="41"/><line x1="-46" x2="-41"/>
+    </g>
+    <g stroke="rgba(255,255,255,.28)" stroke-width="1">
+      <line x1="32.5" y1="-32.5" x2="29" y2="-29"/><line x1="32.5" y1="32.5" x2="29" y2="29"/>
+      <line x1="-32.5" y1="32.5" x2="-29" y2="29"/><line x1="-32.5" y1="-32.5" x2="-29" y2="-29"/>
+    </g>
+    <polygon points="0,-24 6.5,0 -6.5,0" fill="#e5533d"/>
+    <polygon points="0,24 6.5,0 -6.5,0" fill="#f3f1ea" opacity=".85"/>
+    <circle r="2.2" fill="#12161a"/>
+    <text y="-29" text-anchor="middle" font-size="13" font-weight="700" fill="#ffd9c9" font-family="-apple-system, system-ui, sans-serif">N</text>
+    <text x="34" y="4" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.7)" font-family="-apple-system, system-ui, sans-serif">O</text>
+    <text y="38" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.7)" font-family="-apple-system, system-ui, sans-serif">S</text>
+    <text x="-34" y="4" text-anchor="middle" font-size="9" fill="rgba(255,255,255,.7)" font-family="-apple-system, system-ui, sans-serif">W</text>
+  </g></svg>
+</button>
+<div id="compassText"></div>
+<div id="hint">Ziehen: verschieben · Rechte Maustaste: drehen · Scrollen: zoomen</div>
+<div id="credit">Datenquelle: <a href="https://www.geodaten.bayern.de" target="_blank" rel="noopener">Bayerische Vermessungsverwaltung – www.geodaten.bayern.de</a> (CC BY 4.0)<br>LoD2-Gebäude · DGM1 · DOP20 (Bildflug 29.06.2024) · Laserpunkte · Straßennamen/Firmen: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende</div>
+
+<div id="loader"><div class="box">
+  <h2>Passau</h2><p>3D-Modell wird aufgebaut …</p>
+  <div id="track"><div id="bar"></div></div><div id="stage">Start</div>
+</div></div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

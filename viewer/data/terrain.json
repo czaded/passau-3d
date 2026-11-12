@@ -1,0 +1,17 @@
+{
+ "crs": "EPSG:25832 (ETRS89 / UTM 32N), H\u00f6hen DHHN2016",
+ "eMin": 827000.0,
+ "eMax": 831000.0,
+ "nMin": 5388000.0,
+ "nMax": 5391000.0,
+ "originE": 829000.0,
+ "originN": 5389500.0,
+ "chunk": 500.0,
+ "step": 2,
+ "gridCols": 2001,
+ "gridRows": 1501,
+ "hBase": 250.0,
+ "hScale": 0.01,
+ "hMin": 290.5005187988281,
+ "hMax": 427.29901123046875
+}

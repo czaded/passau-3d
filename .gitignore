@@ -1,0 +1,7 @@
+# Rohdaten, Zwischenstände, Logs und Screenshots (3,3 GB+; entstehen mit ./build.sh neu)
+/data/
+# Werkzeuge
+.venv/
+node_modules/
+__pycache__/
+.DS_Store

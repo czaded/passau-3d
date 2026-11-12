@@ -1,0 +1,12 @@
+numpy
+pillow
+lxml
+tifffile
+imagecodecs
+mapbox-earcut
+shapely
+scipy
+laspy
+lazrs
+pyproj
+requests
